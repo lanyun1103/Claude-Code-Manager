@@ -94,7 +94,7 @@
 - [x] 去掉 merging/conflict 状态、resolve-conflict 端点
 - [x] TaskForm 重构：创建任务时可直接新建项目（输入名称 + 可选 remote URL）
 - [x] 去掉 targetRepo 手动填路径方式，统一通过 project_id 关联
-- **Commit**: (待提交)
+- **Commit**: 231a0b7
 
 ### 文档
 - [x] README.md
@@ -156,7 +156,7 @@
 - **原因**: 专注实现功能忽略了流程规范
 - **解决**: 补跑测试确认全绿，补更新三个文档
 - **预防**: 每次改代码严格按流程：1) 先跑测试 2) 改代码 3) 再跑测试 4) 更新四个文档
-- **Commit**: (待提交)
+- **Commit**: 231a0b7
 
 ---
 
