@@ -74,6 +74,18 @@
 - [x] IME 组合输入处理 (防止中文输入法 Enter 发送)
 - [x] 过滤空的 partial streaming 消息
 
+### 阶段 12：任务生命周期重构
+- [x] GlobalDispatcher — 全局调度器，替代 per-instance RalphLoop
+- [x] 9 步任务生命周期: pending → in_progress → executing → merging → completed
+- [x] worktree 创建前 git fetch origin，基于远程分支
+- [x] 完成后 rebase + merge --ff-only + push (带重试 + merge lock)
+- [x] conflict 状态 + 冲突解决端点
+- [x] Project 模型 (name, git_url, local_path) + 自动 clone
+- [x] Task.project_id 关联 Project，dispatcher 自动解析为 target_repo
+- [x] 修复 dequeue() 排序 bug (desc → asc)
+- [x] 前端: 项目选择器、新状态颜色、Dispatcher 全局开关
+- **Commit**: c1407e4
+
 ### 文档
 - [x] README.md
 - [x] CLAUDE.md
@@ -90,28 +102,28 @@
 - **原因**: Vite 会去除 type-only exports，`import { Instance } from '../../api/client'` 失败
 - **解决**: 类型用 `import type { X }` 单独导入，值用 `import { api }` 导入
 - **预防**: 前端所有类型导入必须用 `import type`，已写入 CLAUDE.md 约定
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ### 优先级排序反了
 - **问题**: P1 任务在 P0 之前执行
 - **原因**: 代码用了 `Task.priority.desc()`，而约定是数字越小优先级越高
 - **解决**: 改为 `Task.priority.asc()`
 - **预防**: 已在 CLAUDE.md 注明「优先级数字越小越高，排序用 `.asc()`」
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ### 多轮对话 resume 失败
 - **问题**: Follow-up 消息报错 `No conversation found with session ID`
 - **原因**: Claude Code 的 session 文件按 cwd 路径存储，follow-up 时 cwd 变了导致找不到 session
 - **解决**: 在 Task 模型上新增 `last_cwd` 字段，launch 时记录，resume 时使用相同 cwd
 - **预防**: 已在 CLAUDE.md 注明「resume 必须使用和原始 session 相同的 cwd」
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ### session_id 应绑定 Task 而非 Instance
 - **问题**: 最初将 session_id 放在 Instance 上，导致 Instance 切换任务后丢失之前任务的 session
 - **原因**: Instance 是 worker 会轮换处理多个 task，session 应该跟着 task 走
 - **解决**: 将 session_id 和 last_cwd 从 Instance 模型迁移到 Task 模型
 - **预防**: 已在 CLAUDE.md 注明「session_id 和 last_cwd 在 Task 上，不是 Instance」
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ### Chat 消息显示重复
 - **问题**: 用户发的 follow-up 消息和 Claude 回复都显示两遍
@@ -119,14 +131,14 @@
 - **原因2**: 助手消息 — Claude Code 的 stream-json 会发多条 message 事件，部分 content 为 null（流式 chunk），有内容的和空的都被渲染了
 - **解决**: WebSocket 监听忽略 `user_message` 事件；过滤 content 为 null 的 `message`/`result` 事件
 - **预防**: 前端接收 WebSocket 消息时注意去重和过滤无效数据
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ### 前端构建 TS 报错未使用变量
 - **问题**: `npm run build` 因未使用的 import 报 TS6133 错误
 - **原因**: 重构时移除了功能但没清理对应的 import
 - **解决**: 删除未使用的 import (`Play`, `api`, `useCallback`)
 - **预防**: 重构后检查相关文件的 import 是否需要清理
-- **Commit**: 待补充
+- **Commit**: c1407e4
 
 ---
 
