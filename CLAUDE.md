@@ -176,6 +176,7 @@ rm claude_manager.db  # 下次启动自动重建
 - **改代码后**：再跑一遍确认无回归 + `cd frontend && npx tsc --noEmit` 检查类型
 - **新增功能**：同步新增测试用例，更新 [TEST.md](./TEST.md)
 - **修 bug**：先写复现 bug 的测试（红），修复后确认变绿
+- **提交代码**：改完代码 + 更新文档后，`git commit` + `git push origin main`（默认必须 push）
 - 详细测试清单和手动测试项见 [TEST.md](./TEST.md)
 
 ## 经验教训沉淀
