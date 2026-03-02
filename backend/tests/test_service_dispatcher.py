@@ -166,8 +166,8 @@ async def test_lifecycle_success(db_factory):
         t = await db.get(Task, task_obj.id)
         assert t.status == "completed"
 
-    # Verify worktree removed
-    d.worktree_manager.remove.assert_awaited_once()
+    # Worktree should NOT be removed on success (kept for chat resume)
+    d.worktree_manager.remove.assert_not_awaited()
 
     # Verify broadcast called
     assert d.broadcaster.broadcast.await_count >= 2

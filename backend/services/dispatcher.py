@@ -273,9 +273,8 @@ class GlobalDispatcher:
                 "instance_id": instance_id,
             })
 
-            # Cleanup worktree
-            if worktree:
-                await self.worktree_manager.remove(worktree)
+            # Keep worktree alive so chat can --resume with the same cwd.
+            # Worktrees are cleaned up only on failure/exception or manual delete.
 
             # Update instance stats
             async with self.db_factory() as db:

@@ -72,13 +72,15 @@ async def send_chat_message(
         "content": body.message,
     })
 
-    # Determine cwd: must use last_cwd because session is bound to that directory
+    # Determine cwd: prefer last_cwd (session is bound to that directory),
+    # fallback to target_repo only if last_cwd is missing
     cwd = task.last_cwd
+    if not cwd or not os.path.isdir(cwd):
+        cwd = task.target_repo
     if not cwd or not os.path.isdir(cwd):
         raise HTTPException(
             400,
-            "Session working directory no longer exists (worktree may have been cleaned up). "
-            "Cannot resume this conversation.",
+            "Session working directory no longer exists. Cannot resume this conversation.",
         )
 
     # Launch with --resume, using the task's cwd
