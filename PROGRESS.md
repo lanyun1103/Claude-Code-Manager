@@ -113,7 +113,7 @@
 - [x] 主项目 CLAUDE.md 同步更新生命周期描述
 - [x] chat.py 简化 cwd 逻辑（不再需要 worktree 路径 fallback）
 - [x] 测试同步更新（去掉 worktree_manager mock，更新 cwd 测试）
-- **Commit**: (待提交)
+- **Commit**: bebb4c1
 
 ### 文档
 - [x] README.md
