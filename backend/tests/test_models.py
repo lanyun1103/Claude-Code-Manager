@@ -85,3 +85,100 @@ async def test_project_unique_name(db_session):
     db_session.add(proj2)
     with pytest.raises(IntegrityError):
         await db_session.commit()
+
+
+# === LogEntry tests ===
+
+
+@pytest.mark.asyncio
+async def test_log_entry_defaults(db_session):
+    from backend.models.log_entry import LogEntry
+
+    entry = LogEntry(instance_id=1, event_type="message")
+    db_session.add(entry)
+    await db_session.commit()
+    await db_session.refresh(entry)
+
+    assert entry.is_error is False
+    assert entry.timestamp is not None
+    assert entry.role is None
+    assert entry.content is None
+    assert entry.tool_name is None
+    assert entry.tool_input is None
+    assert entry.tool_output is None
+    assert entry.task_id is None
+
+
+@pytest.mark.asyncio
+async def test_log_entry_with_tool_fields(db_session):
+    from backend.models.log_entry import LogEntry
+
+    entry = LogEntry(
+        instance_id=1,
+        event_type="tool_use",
+        role="assistant",
+        tool_name="Edit",
+        tool_input='{"file_path": "/tmp/x.py"}',
+        tool_output="ok",
+        raw_json='{"type": "tool_use"}',
+    )
+    db_session.add(entry)
+    await db_session.commit()
+    await db_session.refresh(entry)
+
+    assert entry.tool_name == "Edit"
+    assert entry.tool_input == '{"file_path": "/tmp/x.py"}'
+    assert entry.tool_output == "ok"
+    assert entry.raw_json == '{"type": "tool_use"}'
+
+
+# === Worktree tests ===
+
+
+@pytest.mark.asyncio
+async def test_worktree_defaults(db_session):
+    from backend.models.worktree import Worktree
+
+    wt = Worktree(repo_path="/repo", worktree_path="/wt/1", branch_name="task-1")
+    db_session.add(wt)
+    await db_session.commit()
+    await db_session.refresh(wt)
+
+    assert wt.status == "active"
+    assert wt.base_branch == "main"
+    assert wt.created_at is not None
+    assert wt.removed_at is None
+    assert wt.instance_id is None
+
+
+@pytest.mark.asyncio
+async def test_worktree_unique_path(db_session):
+    from sqlalchemy.exc import IntegrityError
+    from backend.models.worktree import Worktree
+
+    wt1 = Worktree(repo_path="/repo", worktree_path="/wt/same", branch_name="b1")
+    db_session.add(wt1)
+    await db_session.commit()
+
+    wt2 = Worktree(repo_path="/repo", worktree_path="/wt/same", branch_name="b2")
+    db_session.add(wt2)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_worktree_removed_at_nullable(db_session):
+    from backend.models.worktree import Worktree
+    from datetime import datetime
+
+    wt = Worktree(repo_path="/repo", worktree_path="/wt/2", branch_name="task-2")
+    db_session.add(wt)
+    await db_session.commit()
+    await db_session.refresh(wt)
+    assert wt.removed_at is None
+
+    # Can set removed_at
+    wt.removed_at = datetime.utcnow()
+    await db_session.commit()
+    await db_session.refresh(wt)
+    assert wt.removed_at is not None

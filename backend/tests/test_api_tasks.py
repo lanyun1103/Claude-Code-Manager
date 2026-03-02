@@ -1,45 +1,11 @@
 """Tests for Task API endpoints."""
 import pytest
 import pytest_asyncio
-from unittest.mock import AsyncMock, patch
-from httpx import AsyncClient, ASGITransport
-
-from backend.database import Base
+from sqlalchemy import update
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
-@pytest_asyncio.fixture
-async def app(db_engine):
-    """Create a test FastAPI app with in-memory DB."""
-    from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
-
-    session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
-
-    # Patch the get_db dependency and settings
-    from backend.main import app as real_app
-    from backend.database import get_db
-
-    async def override_get_db():
-        async with session_factory() as session:
-            yield session
-
-    real_app.dependency_overrides[get_db] = override_get_db
-
-    # Patch auth middleware to skip auth in tests
-    from backend.config import settings
-    original_token = settings.auth_token
-    settings.auth_token = ""
-
-    yield real_app
-
-    real_app.dependency_overrides.clear()
-    settings.auth_token = original_token
-
-
-@pytest_asyncio.fixture
-async def client(app):
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
+# === Existing tests ===
 
 
 @pytest.mark.asyncio
@@ -131,3 +97,89 @@ async def test_retry_task(client):
     assert resp.status_code == 200
 
 
+# === New tests (Phase 2 gaps) ===
+
+
+@pytest.mark.asyncio
+async def test_update_task(client):
+    """PUT /api/tasks/{id} updates task fields."""
+    create_resp = await client.post("/api/tasks", json={
+        "title": "Original", "description": "d", "target_repo": "/tmp",
+    })
+    task_id = create_resp.json()["id"]
+    resp = await client.put(f"/api/tasks/{task_id}", json={"title": "Updated"})
+    assert resp.status_code == 200
+    assert resp.json()["title"] == "Updated"
+
+
+@pytest.mark.asyncio
+async def test_update_task_not_found(client):
+    resp = await client.put("/api/tasks/9999", json={"title": "X"})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_list_tasks_filter_status(client):
+    """GET /api/tasks?status=pending returns only matching tasks."""
+    await client.post("/api/tasks", json={
+        "title": "A", "description": "d", "target_repo": "/tmp",
+    })
+    create2 = await client.post("/api/tasks", json={
+        "title": "B", "description": "d", "target_repo": "/tmp",
+    })
+    # Cancel B so it's not pending
+    await client.post(f"/api/tasks/{create2.json()['id']}/cancel")
+
+    resp = await client.get("/api/tasks?status=pending")
+    assert resp.status_code == 200
+    tasks = resp.json()
+    assert all(t["status"] == "pending" for t in tasks)
+
+
+@pytest.mark.asyncio
+async def test_list_tasks_pagination(client):
+    """GET /api/tasks?limit=1&offset=1 returns second task."""
+    await client.post("/api/tasks", json={
+        "title": "First", "description": "d", "target_repo": "/tmp",
+    })
+    await client.post("/api/tasks", json={
+        "title": "Second", "description": "d", "target_repo": "/tmp",
+    })
+    resp = await client.get("/api/tasks?limit=1&offset=1")
+    assert resp.status_code == 200
+    tasks = resp.json()
+    assert len(tasks) == 1
+
+
+@pytest.mark.asyncio
+async def test_queue_next(client):
+    """GET /api/tasks/queue/next returns pending tasks."""
+    await client.post("/api/tasks", json={
+        "title": "Pending", "description": "d", "target_repo": "/tmp",
+    })
+    resp = await client.get("/api/tasks/queue/next")
+    assert resp.status_code == 200
+    tasks = resp.json()
+    assert len(tasks) >= 1
+    assert all(t["status"] == "pending" for t in tasks)
+
+
+@pytest.mark.asyncio
+async def test_delete_in_progress_rejected(client, session_factory):
+    """Cannot delete a task in in_progress state."""
+    from backend.models.task import Task
+
+    create_resp = await client.post("/api/tasks", json={
+        "title": "T", "description": "d", "target_repo": "/tmp",
+    })
+    task_id = create_resp.json()["id"]
+
+    # Set to in_progress directly in DB
+    async with session_factory() as db:
+        await db.execute(
+            update(Task).where(Task.id == task_id).values(status="in_progress")
+        )
+        await db.commit()
+
+    resp = await client.delete(f"/api/tasks/{task_id}")
+    assert resp.status_code == 400

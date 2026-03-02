@@ -4,6 +4,7 @@ import os
 
 import pytest
 import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from backend.database import Base
@@ -48,4 +49,48 @@ async def db_session(db_engine):
 async def db_factory(db_engine):
     """Returns a session factory (contextmanager), matching the pattern used by services."""
     factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+    return factory
+
+
+# === Shared API test fixtures ===
+
+
+@pytest_asyncio.fixture
+async def app(db_engine):
+    """Create a test FastAPI app with in-memory DB and auth disabled.
+
+    Yields (real_app, session_factory) tuple.
+    """
+    session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
+
+    from backend.main import app as real_app
+    from backend.database import get_db
+
+    async def override_get_db():
+        async with session_factory() as session:
+            yield session
+
+    real_app.dependency_overrides[get_db] = override_get_db
+
+    from backend.config import settings
+    original_token = settings.auth_token
+    settings.auth_token = ""
+
+    yield real_app, session_factory
+
+    real_app.dependency_overrides.clear()
+    settings.auth_token = original_token
+
+
+@pytest_asyncio.fixture
+async def client(app):
+    real_app, _ = app
+    transport = ASGITransport(app=real_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+
+
+@pytest_asyncio.fixture
+async def session_factory(app):
+    _, factory = app
     return factory

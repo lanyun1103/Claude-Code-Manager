@@ -96,12 +96,130 @@ cd frontend && npx tsc --noEmit
 | `test_chat_history_returns_tool_fields` | 历史消息包含 tool_input 和 tool_output 字段 |
 | `test_chat_send_no_session` | 无 session 的 task 发消息返回 400 |
 | `test_chat_send_task_not_found` | 不存在的 task 发消息返回 404 |
+| `test_chat_send_no_idle_instance` | 所有 instance 都在运行时返回 503 |
+| `test_chat_send_task_being_processed` | task 正在被处理时返回 409 |
+| `test_chat_send_cwd_fallback` | last_cwd 无效时回退到 target_repo |
+| `test_chat_send_cwd_both_missing` | cwd 和 target_repo 都缺失返回 400 |
 | `test_plan_approve_not_plan_review` | 非 plan_review 状态 approve 返回 400 |
 | `test_plan_reject_not_plan_review` | 非 plan_review 状态 reject 返回 400 |
 | `test_plan_approve_success` | plan_review 状态 approve → status=pending, plan_approved=True |
 | `test_plan_reject_success` | plan_review 状态 reject → status=cancelled, plan_approved=False |
 | `test_plan_approve_not_found` | 不存在的 task approve 返回 404 |
 | `test_plan_reject_not_found` | 不存在的 task reject 返回 404 |
+
+#### `test_api_system.py` — 系统 API
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_health` | GET /api/system/health → {"status": "ok"} |
+| `test_stats_empty` | 无数据时所有计数为 0 |
+| `test_stats_with_tasks` | 不同状态 task 计数正确 |
+| `test_stats_running_instances` | running 实例计数正确 |
+
+#### `test_api_auth.py` — 认证 API
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_login_no_auth_configured` | auth_token="" 时任何请求都通过 |
+| `test_login_valid_token` | 正确 token 登录成功 |
+| `test_login_invalid_token` | 错误 token 返回 401 |
+| `test_login_missing_token_field` | 空 body 返回 422 |
+
+#### `test_api_projects.py` — 项目 API
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_list_projects_empty` | 空项目列表 |
+| `test_create_project_with_git_url` | 201, has_remote=True |
+| `test_create_project_local_no_git_url` | 201, has_remote=False |
+| `test_create_project_duplicate_name` | 重复名称 400 |
+| `test_get_project` / `test_get_project_not_found` | 获取/404 |
+| `test_update_project` / `test_update_project_not_found` | 更新/404 |
+| `test_update_project_git_url_sets_has_remote` | 设置 git_url 后 has_remote=True |
+| `test_delete_project` / `test_delete_project_not_found` | 删除/404 |
+| `test_reclone_success` | re-clone 成功 |
+| `test_reclone_local_project_rejected` | 本地项目拒绝 re-clone |
+
+#### `test_api_instances.py` — 实例 API
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_list_instances_empty` | 空实例列表 |
+| `test_create_instance` / `test_create_instance_custom_model` | 创建实例 |
+| `test_get_instance` / `test_get_instance_not_found` | 获取/404 |
+| `test_delete_instance` / `test_delete_instance_not_found` | 删除/404 |
+| `test_stop_instance_success` / `test_stop_instance_not_running` | 停止/非运行 |
+| `test_run_with_prompt` / `test_run_with_task_id` | 运行实例 |
+| `test_run_already_running` / `test_run_no_prompt_no_task` | 运行异常 |
+| `test_get_logs` | 获取日志 |
+| `test_dispatcher_status/start/stop` | 调度器控制 |
+| `test_ralph_start/stop/status` | Ralph Loop 控制 |
+
+#### 服务层单元测试
+
+##### `test_service_ws_broadcaster.py` — WebSocket 广播
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_subscribe` / `test_subscribe_multiple_channels` | 订阅单/多频道 |
+| `test_unsubscribe` / `test_unsubscribe_cleans_empty_channels` | 取消订阅 + 清理空频道 |
+| `test_broadcast_sends` | 广播消息到所有订阅者 |
+| `test_broadcast_removes_dead_connections` | 自动移除断开连接 |
+| `test_broadcast_no_subscribers` | 无订阅者不报错 |
+
+##### `test_service_whisper_client.py` — Whisper 客户端
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_transcribe_success` | 正常转录成功 |
+| `test_transcribe_no_api_key` | 无 API key 报 ValueError |
+| `test_transcribe_wav` / `test_transcribe_mp3` | 不同音频格式 |
+| `test_transcribe_api_error` | API 错误抛 HTTPStatusError |
+
+##### `test_service_instance_manager.py` — 实例管理器
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_launch_creates_subprocess` | 启动子进程，正确参数 |
+| `test_launch_with_resume` / `test_launch_with_model` | resume/model 参数 |
+| `test_launch_updates_db` / `test_launch_saves_cwd` | DB 状态更新 |
+| `test_launch_unsets_claude_env` | 排除 CLAUDECODE 环境变量 |
+| `test_stop_terminates` / `test_stop_kills_on_timeout` | 正常停止/超时 kill |
+| `test_is_running` | 运行状态检测 |
+
+##### `test_service_worktree_manager.py` — Worktree 管理器
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_create_success` | 创建 worktree + DB 记录 |
+| `test_create_fetch_fails_continues` | fetch 失败继续创建 |
+| `test_create_origin_branch_missing_fallback` | origin 分支不存在时回退 |
+| `test_sync_latest_success` / `test_sync_latest_conflict` | 同步成功/冲突 |
+| `test_merge_to_main_success` / `test_merge_to_main_conflict` | 合并成功/冲突 |
+| `test_remove_worktree` | 删除 worktree + DB 更新 |
+
+##### `test_service_ralph_loop.py` — Ralph Loop 生命周期
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_start_creates_task` / `test_start_idempotent` | 启动/幂等性 |
+| `test_stop_cancels` | 停止取消任务 |
+| `test_is_running_true` / `test_is_running_false` | 运行状态检测 |
+
+##### `test_service_dispatcher.py` — 全局调度器
+
+| 测试 | 验证内容 |
+|------|---------|
+| `test_status_not_running` | 初始状态 running=False |
+| `test_start_sets_running` / `test_start_idempotent` | 启动/幂等性 |
+| `test_stop` | 停止并取消所有任务 |
+| `test_ensure_instances_creates_workers` | 自动创建 worker 实例 |
+| `test_ensure_instances_skips_if_enough` | 已有足够实例时跳过 |
+| `test_lifecycle_success` | 完整成功生命周期 |
+| `test_lifecycle_failure_retry` / `test_lifecycle_failure_max_retries` | 失败重试/达到上限 |
+| `test_lifecycle_worktree_fails` | worktree 创建失败时继续 |
+| `test_lifecycle_exception` | 异常标记 task failed |
+| `test_plan_phase` | plan 模式进入 plan_review |
 
 ### 前端检查
 
@@ -248,7 +366,14 @@ git branch
 | `backend/models/*.py` | `backend/tests/test_models.py` |
 | `backend/api/tasks.py` | `backend/tests/test_api_tasks.py` |
 | `backend/api/chat.py` + `backend/api/tasks.py` (plan) | `backend/tests/test_api_chat_plan.py` |
-| `backend/services/dispatcher.py` | (待补充 — 需 mock 子进程) |
-| `backend/services/worktree_manager.py` | (待补充 — 需 mock git) |
-| `backend/api/projects.py` | (待补充 — 需 mock git clone) |
+| `backend/api/system.py` | `backend/tests/test_api_system.py` |
+| `backend/api/auth.py` | `backend/tests/test_api_auth.py` |
+| `backend/api/projects.py` | `backend/tests/test_api_projects.py` |
+| `backend/api/instances.py` | `backend/tests/test_api_instances.py` |
+| `backend/services/dispatcher.py` | `backend/tests/test_service_dispatcher.py` |
+| `backend/services/worktree_manager.py` | `backend/tests/test_service_worktree_manager.py` |
+| `backend/services/instance_manager.py` | `backend/tests/test_service_instance_manager.py` |
+| `backend/services/ralph_loop.py` | `backend/tests/test_service_ralph_loop.py` |
+| `backend/services/ws_broadcaster.py` | `backend/tests/test_service_ws_broadcaster.py` |
+| `backend/services/whisper_client.py` | `backend/tests/test_service_whisper_client.py` |
 | `frontend/src/**` | TypeScript 类型检查 (`tsc --noEmit`) |

@@ -1,49 +1,12 @@
 """Tests for Chat and Plan API endpoints."""
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient, ASGITransport
+from unittest.mock import AsyncMock, MagicMock, patch
 from sqlalchemy import update
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.database import Base, get_db
 from backend.models.task import Task
-
-
-@pytest_asyncio.fixture
-async def app(db_engine):
-    """Create a test FastAPI app with in-memory DB."""
-    session_factory = async_sessionmaker(db_engine, class_=AsyncSession, expire_on_commit=False)
-
-    from backend.main import app as real_app
-
-    async def override_get_db():
-        async with session_factory() as session:
-            yield session
-
-    real_app.dependency_overrides[get_db] = override_get_db
-
-    from backend.config import settings
-    original_token = settings.auth_token
-    settings.auth_token = ""
-
-    yield real_app, session_factory
-
-    real_app.dependency_overrides.clear()
-    settings.auth_token = original_token
-
-
-@pytest_asyncio.fixture
-async def client(app):
-    real_app, _ = app
-    transport = ASGITransport(app=real_app)
-    async with AsyncClient(transport=transport, base_url="http://test") as c:
-        yield c
-
-
-@pytest_asyncio.fixture
-async def session_factory(app):
-    _, factory = app
-    return factory
+from backend.models.instance import Instance
 
 
 # === Chat tests ===
@@ -216,3 +179,119 @@ async def test_plan_approve_not_found(client):
 async def test_plan_reject_not_found(client):
     resp = await client.post("/api/tasks/9999/plan/reject")
     assert resp.status_code == 404
+
+
+# === Chat send extra tests ===
+
+
+async def _create_task_with_session(client, session_factory, **extra_fields):
+    """Helper: create a task and set session_id + target_repo in DB."""
+    create_resp = await client.post("/api/tasks", json={
+        "title": "Chat Task", "description": "d", "target_repo": "/tmp",
+    })
+    task_id = create_resp.json()["id"]
+    values = {"session_id": "test-session-123", **extra_fields}
+    async with session_factory() as db:
+        await db.execute(update(Task).where(Task.id == task_id).values(**values))
+        await db.commit()
+    return task_id
+
+
+@pytest.mark.asyncio
+async def test_chat_send_no_idle_instance(client, session_factory):
+    """Task has session but no idle instances exist."""
+    task_id = await _create_task_with_session(client, session_factory)
+
+    mock_im = MagicMock()
+    mock_im.processes = {}
+    mock_broadcaster = MagicMock()
+    mock_broadcaster.broadcast = AsyncMock()
+
+    with patch("backend.main.instance_manager", mock_im), \
+         patch("backend.main.broadcaster", mock_broadcaster):
+        resp = await client.post(f"/api/tasks/{task_id}/chat", json={"message": "hi"})
+    assert resp.status_code == 400
+    assert "no idle instance" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_chat_send_task_being_processed(client, session_factory):
+    """Task has session but an instance is currently processing it."""
+    task_id = await _create_task_with_session(client, session_factory)
+
+    # Create an instance that's "running" this task
+    async with session_factory() as db:
+        inst = Instance(name="busy-inst", status="idle", current_task_id=task_id)
+        db.add(inst)
+        await db.commit()
+        await db.refresh(inst)
+        inst_id = inst.id
+
+    # Mock a process with returncode=None (still running) for this instance
+    mock_proc = MagicMock()
+    mock_proc.returncode = None
+    mock_im = MagicMock()
+    mock_im.processes = {inst_id: mock_proc}
+
+    with patch("backend.main.instance_manager", mock_im):
+        resp = await client.post(f"/api/tasks/{task_id}/chat", json={"message": "hi"})
+    assert resp.status_code == 400
+    assert "currently being processed" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_chat_send_cwd_fallback(client, session_factory):
+    """When last_cwd doesn't exist, falls back to target_repo."""
+    task_id = await _create_task_with_session(
+        client, session_factory,
+        last_cwd="/nonexistent/worktree/path",
+        target_repo="/tmp",  # /tmp exists
+    )
+
+    # Create an idle instance
+    async with session_factory() as db:
+        inst = Instance(name="idle-inst", status="idle")
+        db.add(inst)
+        await db.commit()
+
+    mock_im = MagicMock()
+    mock_im.processes = {}
+    mock_im.launch = AsyncMock(return_value=42)
+    mock_broadcaster = MagicMock()
+    mock_broadcaster.broadcast = AsyncMock()
+
+    with patch("backend.main.instance_manager", mock_im), \
+         patch("backend.main.broadcaster", mock_broadcaster):
+        resp = await client.post(f"/api/tasks/{task_id}/chat", json={"message": "followup"})
+    assert resp.status_code == 200
+    # Verify launch was called with /tmp as cwd (fallback)
+    mock_im.launch.assert_awaited_once()
+    call_kwargs = mock_im.launch.call_args
+    assert call_kwargs.kwargs.get("cwd") == "/tmp" or call_kwargs[1].get("cwd") == "/tmp"
+
+
+@pytest.mark.asyncio
+async def test_chat_send_cwd_both_missing(client, session_factory):
+    """Both last_cwd and target_repo don't exist -> 400."""
+    task_id = await _create_task_with_session(
+        client, session_factory,
+        last_cwd="/nonexistent/a",
+        target_repo="/nonexistent/b",
+    )
+
+    # Create an idle instance
+    async with session_factory() as db:
+        inst = Instance(name="idle-inst-2", status="idle")
+        db.add(inst)
+        await db.commit()
+
+    mock_im = MagicMock()
+    mock_im.processes = {}
+    mock_broadcaster = MagicMock()
+    mock_broadcaster.broadcast = AsyncMock()
+
+    with patch("backend.main.instance_manager", mock_im), \
+         patch("backend.main.broadcaster", mock_broadcaster):
+        resp = await client.post(f"/api/tasks/{task_id}/chat", json={"message": "hi"})
+    assert resp.status_code == 400
+    assert "directory" in resp.json()["detail"].lower()

@@ -1,3 +1,5 @@
+import os
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -41,10 +43,9 @@ async def send_chat_message(
     # Check no instance is currently working on this task
     for inst_id, proc in instance_manager.processes.items():
         if proc.returncode is None:
-            async with db.begin():
-                inst = await db.get(Instance, inst_id)
-                if inst and inst.current_task_id == task_id:
-                    raise HTTPException(400, "Task is currently being processed. Wait for it to finish.")
+            inst = await db.get(Instance, inst_id)
+            if inst and inst.current_task_id == task_id:
+                raise HTTPException(400, "Task is currently being processed. Wait for it to finish.")
 
     # Find an idle instance
     inst = await _find_idle_instance(db)
@@ -71,12 +72,19 @@ async def send_chat_message(
         "content": body.message,
     })
 
+    # Determine cwd: prefer last_cwd, fallback to target_repo if worktree was cleaned up
+    cwd = task.last_cwd
+    if not cwd or not os.path.isdir(cwd):
+        cwd = task.target_repo
+    if not cwd or not os.path.isdir(cwd):
+        raise HTTPException(400, "Task working directory no longer exists.")
+
     # Launch with --resume, using the task's cwd
     pid = await instance_manager.launch(
         instance_id=inst.id,
         prompt=body.message,
         task_id=task_id,
-        cwd=task.last_cwd or task.target_repo,
+        cwd=cwd,
         model=inst.model,
         resume_session_id=task.session_id,
     )

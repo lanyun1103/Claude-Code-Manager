@@ -96,6 +96,15 @@
 - [x] 去掉 targetRepo 手动填路径方式，统一通过 project_id 关联
 - **Commit**: 231a0b7
 
+### 阶段 14：全面补齐测试覆盖
+- [x] 整合 conftest.py 共享 fixture（app/client/session_factory）
+- [x] 新增 102 个测试（52 → 154 总计）
+- [x] 覆盖所有 API 端点：system、auth、projects、instances、chat 补全
+- [x] 覆盖所有服务层：dispatcher、instance_manager、worktree_manager、ralph_loop、ws_broadcaster、whisper_client
+- [x] 修复 chat.py 中多余的 `db.begin()` 导致事务冲突 bug
+- [x] 修复 chat.py 中 last_cwd 指向已清理 worktree 的 bug（添加 os.path.isdir 回退）
+- **Commit**: (待提交)
+
 ### 文档
 - [x] README.md
 - [x] CLAUDE.md
