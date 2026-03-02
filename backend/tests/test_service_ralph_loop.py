@@ -10,7 +10,6 @@ def _make_ralph_loop():
     return RalphLoop(
         db_factory=MagicMock(),
         instance_manager=MagicMock(),
-        worktree_manager=MagicMock(),
         broadcaster=MagicMock(),
     )
 

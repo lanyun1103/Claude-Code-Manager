@@ -98,8 +98,8 @@ cd frontend && npx tsc --noEmit
 | `test_chat_send_task_not_found` | 不存在的 task 发消息返回 404 |
 | `test_chat_send_no_idle_instance` | 所有 instance 都在运行时返回 503 |
 | `test_chat_send_task_being_processed` | task 正在被处理时返回 409 |
-| `test_chat_send_cwd_fallback` | last_cwd 无效时回退到 target_repo |
-| `test_chat_send_cwd_both_missing` | cwd 和 target_repo 都缺失返回 400 |
+| `test_chat_send_cwd_uses_last_cwd` | 使用 last_cwd 作为工作目录 |
+| `test_chat_send_cwd_not_found` | 工作目录不存在返回 400 |
 | `test_plan_approve_not_plan_review` | 非 plan_review 状态 approve 返回 400 |
 | `test_plan_reject_not_plan_review` | 非 plan_review 状态 reject 返回 400 |
 | `test_plan_approve_success` | plan_review 状态 approve → status=pending, plan_approved=True |
@@ -217,7 +217,6 @@ cd frontend && npx tsc --noEmit
 | `test_ensure_instances_skips_if_enough` | 已有足够实例时跳过 |
 | `test_lifecycle_success` | 完整成功生命周期 |
 | `test_lifecycle_failure_retry` / `test_lifecycle_failure_max_retries` | 失败重试/达到上限 |
-| `test_lifecycle_worktree_fails` | worktree 创建失败时继续 |
 | `test_lifecycle_exception` | 异常标记 task failed |
 | `test_plan_phase` | plan 模式进入 plan_review |
 

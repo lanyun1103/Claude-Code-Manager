@@ -240,12 +240,11 @@ async def test_chat_send_task_being_processed(client, session_factory):
 
 
 @pytest.mark.asyncio
-async def test_chat_send_cwd_fallback(client, session_factory):
-    """When last_cwd doesn't exist, falls back to target_repo."""
+async def test_chat_send_cwd_uses_last_cwd(client, session_factory):
+    """When last_cwd exists, uses it as cwd."""
     task_id = await _create_task_with_session(
         client, session_factory,
-        last_cwd="/nonexistent/worktree/path",
-        target_repo="/tmp",  # /tmp exists
+        last_cwd="/tmp",  # /tmp exists
     )
 
     # Create an idle instance
@@ -264,19 +263,17 @@ async def test_chat_send_cwd_fallback(client, session_factory):
          patch("backend.main.broadcaster", mock_broadcaster):
         resp = await client.post(f"/api/tasks/{task_id}/chat", json={"message": "followup"})
     assert resp.status_code == 200
-    # Verify launch was called with /tmp as cwd (fallback)
     mock_im.launch.assert_awaited_once()
     call_kwargs = mock_im.launch.call_args
     assert call_kwargs.kwargs.get("cwd") == "/tmp" or call_kwargs[1].get("cwd") == "/tmp"
 
 
 @pytest.mark.asyncio
-async def test_chat_send_cwd_both_missing(client, session_factory):
-    """Both last_cwd and target_repo don't exist -> 400."""
+async def test_chat_send_cwd_not_found(client, session_factory):
+    """When cwd doesn't exist -> 400."""
     task_id = await _create_task_with_session(
         client, session_factory,
         last_cwd="/nonexistent/a",
-        target_repo="/nonexistent/b",
     )
 
     # Create an idle instance

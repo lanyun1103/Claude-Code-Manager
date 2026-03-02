@@ -10,7 +10,6 @@ from backend.models.task import Task
 from backend.models.project import Project
 from backend.services.instance_manager import InstanceManager
 from backend.services.task_queue import TaskQueue
-from backend.services.worktree_manager import WorktreeManager, WorktreeInfo
 from backend.services.ws_broadcaster import WebSocketBroadcaster
 
 logger = logging.getLogger(__name__)
@@ -19,10 +18,10 @@ logger = logging.getLogger(__name__)
 class GlobalDispatcher:
     """Single global dispatcher that manages all instances and task lifecycle.
 
-    Claude Code is fully autonomous — it handles commit, fetch, merge, push,
-    and conflict resolution itself. The dispatcher only manages:
+    Claude Code is fully autonomous — it handles worktree creation, commit,
+    fetch, merge, push, conflict resolution, and cleanup itself via CLAUDE.md.
+    The dispatcher only manages:
     - Task assignment (dequeue)
-    - Worktree creation/cleanup
     - Starting/waiting on Claude Code processes
     - Marking tasks completed/failed
     """
@@ -31,12 +30,10 @@ class GlobalDispatcher:
         self,
         db_factory,
         instance_manager: InstanceManager,
-        worktree_manager: WorktreeManager,
         broadcaster: WebSocketBroadcaster,
     ):
         self.db_factory = db_factory
         self.instance_manager = instance_manager
-        self.worktree_manager = worktree_manager
         self.broadcaster = broadcaster
         self._dispatch_task: asyncio.Task | None = None
         self._running_tasks: dict[int, asyncio.Task] = {}  # instance_id -> lifecycle task
@@ -152,10 +149,13 @@ class GlobalDispatcher:
                 await asyncio.sleep(5)
 
     async def _run_task_lifecycle(self, instance_id: int, task: Task):
-        """Execute the task lifecycle: assign → worktree → Claude Code → cleanup."""
-        worktree: WorktreeInfo | None = None
+        """Execute the task lifecycle: assign → Claude Code → judge result.
+
+        Claude Code handles worktree creation, git operations, and cleanup
+        autonomously based on the project's CLAUDE.md instructions.
+        """
         try:
-            # === Step 1: Mark in_progress (already done by dequeue) ===
+            # === Step 1: Mark in_progress ===
             await self.broadcaster.broadcast("tasks", {
                 "event": "status_change",
                 "task_id": task.id,
@@ -164,41 +164,13 @@ class GlobalDispatcher:
                 "instance_id": instance_id,
             })
 
-            # === Step 2: Create workspace ===
+            # === Step 2: Determine cwd and update task ===
             cwd = task.target_repo or "."
-            branch_name = f"task-{task.id}-{task.title[:20].replace(' ', '-').lower()}"
-            base_branch = task.target_branch or "main"
-
-            try:
-                worktree = await self.worktree_manager.create(
-                    repo_path=cwd,
-                    branch_name=branch_name,
-                    base_branch=base_branch,
-                    instance_id=instance_id,
-                )
-                cwd = worktree.path
-
-                async with self.db_factory() as db:
-                    await db.execute(
-                        update(Task)
-                        .where(Task.id == task.id)
-                        .values(result_branch=branch_name, instance_id=instance_id)
-                    )
-                    await db.commit()
-            except RuntimeError as e:
-                logger.warning(f"Worktree creation failed, using repo directly: {e}")
-                async with self.db_factory() as db:
-                    await db.execute(
-                        update(Task)
-                        .where(Task.id == task.id)
-                        .values(instance_id=instance_id)
-                    )
-                    await db.commit()
-
-            # === Step 3: Execute (Claude Code — fully autonomous) ===
             async with self.db_factory() as db:
                 await db.execute(
-                    update(Task).where(Task.id == task.id).values(status="executing")
+                    update(Task)
+                    .where(Task.id == task.id)
+                    .values(status="executing", instance_id=instance_id)
                 )
                 await db.commit()
             await self.broadcaster.broadcast("tasks", {
@@ -208,14 +180,13 @@ class GlobalDispatcher:
                 "instance_id": instance_id,
             })
 
-            # Plan mode handling
+            # === Step 3: Plan mode check ===
             if task.mode == "plan" and not task.plan_approved:
                 await self._run_plan_phase(instance_id, task, cwd)
-                return  # Wait for plan approval, task goes back to pending
+                return
 
-            # Build prompt with worktree context
-            full_prompt = f"""你正在 worktree 分支 `{branch_name}` 中工作，基于 `{base_branch}`。
-请阅读项目根目录的 CLAUDE.md 了解项目规范和任务完成后的 git 流程。
+            # === Step 4: Launch Claude Code ===
+            full_prompt = f"""请阅读项目根目录的 CLAUDE.md 了解项目规范和任务完成后的 git 流程。
 
 任务:
 {task.description}"""
@@ -235,8 +206,8 @@ class GlobalDispatcher:
 
             exit_code = process.returncode if process else -1
 
+            # === Step 5: Judge result ===
             if exit_code != 0:
-                # Execution failed — retry or mark failed
                 async with self.db_factory() as db:
                     queue = TaskQueue(db)
                     t = await queue.get(task.id)
@@ -253,15 +224,9 @@ class GlobalDispatcher:
                     "new_status": status,
                     "instance_id": instance_id,
                 })
-
-                if worktree:
-                    await self.worktree_manager.remove(worktree)
                 return
 
             # === Claude Code completed successfully ===
-            # (Claude Code handles commit, merge, push autonomously)
-
-            # Mark completed
             async with self.db_factory() as db:
                 queue = TaskQueue(db)
                 await queue.mark_completed(task.id)
@@ -273,10 +238,6 @@ class GlobalDispatcher:
                 "instance_id": instance_id,
             })
 
-            # Keep worktree alive so chat can --resume with the same cwd.
-            # Worktrees are cleaned up only on failure/exception or manual delete.
-
-            # Update instance stats
             async with self.db_factory() as db:
                 await db.execute(
                     update(Instance)
@@ -301,11 +262,6 @@ class GlobalDispatcher:
                 "new_status": "failed",
                 "instance_id": instance_id,
             })
-            if worktree:
-                try:
-                    await self.worktree_manager.remove(worktree)
-                except Exception:
-                    pass
         finally:
             self._running_tasks.pop(instance_id, None)
 

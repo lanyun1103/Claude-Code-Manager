@@ -1,12 +1,11 @@
 """Tests for GlobalDispatcher — task dispatch and lifecycle management."""
 import asyncio
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch, PropertyMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from backend.services.dispatcher import GlobalDispatcher
 from backend.models.instance import Instance
 from backend.models.task import Task
-from backend.services.worktree_manager import WorktreeInfo
 
 
 def _make_dispatcher(db_factory):
@@ -15,20 +14,12 @@ def _make_dispatcher(db_factory):
     instance_manager.launch = AsyncMock(return_value=12345)
     instance_manager.processes = {}
 
-    worktree_manager = MagicMock()
-    worktree_manager.create = AsyncMock(return_value=WorktreeInfo(
-        path="/wt/task-1", branch_name="task-1",
-        base_branch="main", repo_path="/repo", db_id=1,
-    ))
-    worktree_manager.remove = AsyncMock()
-
     broadcaster = MagicMock()
     broadcaster.broadcast = AsyncMock()
 
     dispatcher = GlobalDispatcher(
         db_factory=db_factory,
         instance_manager=instance_manager,
-        worktree_manager=worktree_manager,
         broadcaster=broadcaster,
     )
     return dispatcher
@@ -141,7 +132,6 @@ async def test_lifecycle_success(db_factory):
     """_run_task_lifecycle completes task successfully."""
     d = _make_dispatcher(db_factory)
 
-    # Create instance and task in DB
     async with db_factory() as db:
         inst = Instance(name="worker-1")
         db.add(inst)
@@ -153,7 +143,6 @@ async def test_lifecycle_success(db_factory):
         inst_id = inst.id
         task_obj = task
 
-    # Mock process that completes with exit code 0
     mock_proc = MagicMock()
     mock_proc.returncode = 0
     mock_proc.wait = AsyncMock(return_value=0)
@@ -161,15 +150,10 @@ async def test_lifecycle_success(db_factory):
 
     await d._run_task_lifecycle(inst_id, task_obj)
 
-    # Verify task marked completed
     async with db_factory() as db:
         t = await db.get(Task, task_obj.id)
         assert t.status == "completed"
 
-    # Worktree should NOT be removed on success (kept for chat resume)
-    d.worktree_manager.remove.assert_not_awaited()
-
-    # Verify broadcast called
     assert d.broadcaster.broadcast.await_count >= 2
 
 
@@ -190,7 +174,6 @@ async def test_lifecycle_failure_retry(db_factory):
         inst_id = inst.id
         task_obj = task
 
-    # Mock process with non-zero exit
     mock_proc = MagicMock()
     mock_proc.returncode = 1
     mock_proc.wait = AsyncMock(return_value=1)
@@ -234,43 +217,9 @@ async def test_lifecycle_failure_max_retries(db_factory):
 
 
 @pytest.mark.asyncio
-async def test_lifecycle_worktree_fails(db_factory):
-    """If worktree creation fails, lifecycle continues with repo directly."""
-    d = _make_dispatcher(db_factory)
-    d.worktree_manager.create = AsyncMock(side_effect=RuntimeError("git error"))
-
-    async with db_factory() as db:
-        inst = Instance(name="worker-1")
-        db.add(inst)
-        task = Task(title="wt-fail", description="test", target_repo="/repo")
-        db.add(task)
-        await db.commit()
-        await db.refresh(inst)
-        await db.refresh(task)
-        inst_id = inst.id
-        task_obj = task
-
-    mock_proc = MagicMock()
-    mock_proc.returncode = 0
-    mock_proc.wait = AsyncMock(return_value=0)
-    d.instance_manager.processes = {inst_id: mock_proc}
-
-    await d._run_task_lifecycle(inst_id, task_obj)
-
-    # Should still complete despite worktree failure
-    async with db_factory() as db:
-        t = await db.get(Task, task_obj.id)
-        assert t.status == "completed"
-
-    # Worktree remove should NOT be called (no worktree was created)
-    d.worktree_manager.remove.assert_not_awaited()
-
-
-@pytest.mark.asyncio
 async def test_lifecycle_exception(db_factory):
     """Unexpected exception marks task as failed."""
     d = _make_dispatcher(db_factory)
-    d.worktree_manager.create = AsyncMock(side_effect=RuntimeError("git error"))
     d.instance_manager.launch = AsyncMock(side_effect=Exception("unexpected boom"))
 
     async with db_factory() as db:
@@ -296,7 +245,6 @@ async def test_lifecycle_exception(db_factory):
 async def test_plan_phase(db_factory):
     """Plan-mode task runs plan phase and sets plan_review status."""
     d = _make_dispatcher(db_factory)
-    d.worktree_manager.create = AsyncMock(side_effect=RuntimeError("skip wt"))
 
     async with db_factory() as db:
         inst = Instance(name="worker-1")

@@ -81,9 +81,8 @@ claude-manager/
 - **认证**: 除 `/api/system/health` 和 `/api/auth/login` 外，所有 API 需要 `Authorization: Bearer <token>`
 - **前端 type 导入**: 用 `import type { X }` 导入类型，`import { api }` 导入值（Vite 会去除 type-only exports）
 - **Tailwind v4**: 用 `@import "tailwindcss"` + `@tailwindcss/vite` 插件，无 tailwind.config
-- **调度器**: `GlobalDispatcher` 只负责分配任务和管理 worktree，Claude Code 自主完成整个任务生命周期
+- **调度器**: `GlobalDispatcher` 只负责分配任务、启动 Claude Code、判断成败。所有 git 操作（worktree、commit、merge、push）全由 Claude Code 自主完成
 - **任务生命周期**: pending → in_progress → executing → completed（失败回 pending 重试）
-- **Claude Code 自主**: commit、fetch、merge、push、冲突解决全由 Claude Code 根据项目 CLAUDE.md 自行完成
 - **项目**: `Project` 模型管理 git repo，支持 clone 已有仓库（has_remote=True）和本地 git init（has_remote=False）
 - **Task.project_id**: 可选关联 Project，dispatcher 自动解析为 target_repo
 
@@ -92,7 +91,11 @@ claude-manager/
 你收到任务后，按以下流程自主完成：
 
 1. **领取任务** — 你已被分配任务，阅读 CLAUDE.md 和相关代码
-2. **创建工作区** — 你已在 git worktree 的独立分支中，无需额外操作
+2. **创建工作区**:
+   - `git fetch origin`（如有 remote）
+   - `git worktree add -b task-<简短描述> .claude-manager/worktrees/task-<简短描述> origin/main`
+   - 进入 worktree 目录工作（后续所有操作在 worktree 中）
+   - 如果 worktree 创建失败，直接在当前分支工作
 3. **实现功能** — 编写代码，确保可运行
 4. **提交代码** — `git add` + `git commit`
 5. **Merge + 测试**:
@@ -105,7 +108,10 @@ claude-manager/
    - 成功后: `git checkout main && git merge <task-branch> && git push origin main`
    - 失败则退回步骤 5 重试
 7. **标记完成** — 更新文档（在清理之前）
-8. **清理** — 删除远程 task 分支: `git push origin --delete <task-branch>`（worktree 由调度器清理）
+8. **清理** — 回到项目根目录:
+   - `git worktree remove .claude-manager/worktrees/<worktree名>`
+   - `git branch -D <task-branch>`
+   - 如有 remote: `git push origin --delete <task-branch>`
 9. **经验沉淀** — 在 PROGRESS.md 记录经验教训（可选）
 
 通过 `git remote -v` 判断是否有 remote，有则执行步骤 5-6-8 的 remote 操作，无则跳过。

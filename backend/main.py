@@ -20,24 +20,20 @@ from backend.api.projects import router as projects_router
 from backend.middleware.auth import TokenAuthMiddleware
 from backend.services.ws_broadcaster import WebSocketBroadcaster
 from backend.services.instance_manager import InstanceManager
-from backend.services.worktree_manager import WorktreeManager
 from backend.services.ralph_loop import RalphLoop
 from backend.services.dispatcher import GlobalDispatcher
 
 # Global singletons
 broadcaster = WebSocketBroadcaster()
 instance_manager = InstanceManager(db_factory=async_session, broadcaster=broadcaster)
-worktree_manager = WorktreeManager(db_factory=async_session)
 ralph_loop = RalphLoop(
     db_factory=async_session,
     instance_manager=instance_manager,
-    worktree_manager=worktree_manager,
     broadcaster=broadcaster,
 )
 dispatcher = GlobalDispatcher(
     db_factory=async_session,
     instance_manager=instance_manager,
-    worktree_manager=worktree_manager,
     broadcaster=broadcaster,
 )
 

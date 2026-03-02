@@ -72,16 +72,10 @@ async def send_chat_message(
         "content": body.message,
     })
 
-    # Determine cwd: prefer last_cwd (session is bound to that directory),
-    # fallback to target_repo only if last_cwd is missing
-    cwd = task.last_cwd
+    # Determine cwd: Claude Code launches in repo root, session binds there
+    cwd = task.last_cwd or task.target_repo
     if not cwd or not os.path.isdir(cwd):
-        cwd = task.target_repo
-    if not cwd or not os.path.isdir(cwd):
-        raise HTTPException(
-            400,
-            "Session working directory no longer exists. Cannot resume this conversation.",
-        )
+        raise HTTPException(400, "Task working directory not found.")
 
     # Launch with --resume, using the task's cwd
     pid = await instance_manager.launch(

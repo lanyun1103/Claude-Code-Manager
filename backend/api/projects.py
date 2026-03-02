@@ -117,7 +117,11 @@ def _generate_claude_md(project_name: str, git_url: str | None, default_branch: 
 你收到任务后，按以下 9 步流程自主完成：
 
 1. **领取任务** — 你已被分配任务，阅读本文件和项目代码理解上下文
-2. **创建工作区** — 你已在 git worktree 的独立分支中，无需额外操作
+2. **创建工作区**:
+   - `git fetch origin`（如有 remote）
+   - `git worktree add -b task-<简短描述> .claude-manager/worktrees/task-<简短描述> origin/{default_branch}`
+   - 进入 worktree 目录工作（后续所有操作在 worktree 中）
+   - 如果 worktree 创建失败，直接在当前分支工作
 3. **实现功能** — 编写代码，确保可运行
 4. **提交代码** — `git add` + `git commit`，commit message 简洁描述改动
 5. **Merge + 测试**:
@@ -130,9 +134,10 @@ def _generate_claude_md(project_name: str, git_url: str | None, default_branch: 
    - 如果这一步有任何失败，退回到步骤 5 重试
    - （纯本地项目跳过本步）
 7. **标记完成** — 更新文档（必须在清理之前，防止进程被杀时状态丢失）
-8. **清理**:
-   - 不要手动清理 worktree（由调度器负责）
-   - 如有 remote，删除远程 task 分支: `git push origin --delete <task-branch>`
+8. **清理** — 回到项目根目录:
+   - `git worktree remove .claude-manager/worktrees/<worktree名>`
+   - `git branch -D <task-branch>`
+   - 如有 remote: `git push origin --delete <task-branch>`
 9. **经验沉淀** — 在 PROGRESS.md 记录经验教训（可选）
 
 ### 冲突处理
@@ -179,7 +184,7 @@ rebase 发生冲突时：
 
 ## 注意事项
 
-- 不要切换到其他分支，只在当前 worktree 分支工作
+- 在 worktree 中工作时，不要切换到其他分支
 - 完成任务后确保代码可运行、测试通过
 """
 

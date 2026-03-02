@@ -9,25 +9,26 @@ from backend.models.instance import Instance
 from backend.models.task import Task
 from backend.services.instance_manager import InstanceManager
 from backend.services.task_queue import TaskQueue
-from backend.services.worktree_manager import WorktreeManager, WorktreeInfo
 from backend.services.ws_broadcaster import WebSocketBroadcaster
 
 logger = logging.getLogger(__name__)
 
 
 class RalphLoop:
-    """Auto-continuation loop: pick task -> run -> repeat."""
+    """Auto-continuation loop: pick task -> run -> repeat.
+
+    Claude Code handles worktree creation, git operations, and cleanup
+    autonomously based on the project's CLAUDE.md instructions.
+    """
 
     def __init__(
         self,
         db_factory,
         instance_manager: InstanceManager,
-        worktree_manager: WorktreeManager,
         broadcaster: WebSocketBroadcaster,
     ):
         self.db_factory = db_factory
         self.instance_manager = instance_manager
-        self.worktree_manager = worktree_manager
         self.broadcaster = broadcaster
         self._loops: dict[int, asyncio.Task] = {}
 
@@ -71,38 +72,18 @@ class RalphLoop:
                     "instance_id": instance_id,
                 })
 
-                # Create worktree if target_repo is a git repo
-                worktree = None
-                cwd = task.target_repo
-                branch_name = f"task-{task.id}-{task.title[:20].replace(' ', '-').lower()}"
-                try:
-                    worktree = await self.worktree_manager.create(
-                        repo_path=task.target_repo,
-                        branch_name=branch_name,
-                        base_branch=task.target_branch,
-                        instance_id=instance_id,
+                cwd = task.target_repo or "."
+
+                # Update task with instance assignment
+                async with self.db_factory() as db:
+                    await db.execute(
+                        update(Task)
+                        .where(Task.id == task.id)
+                        .values(instance_id=instance_id)
                     )
-                    cwd = worktree.path
+                    await db.commit()
 
-                    # Update task with result branch
-                    async with self.db_factory() as db:
-                        await db.execute(
-                            update(Task)
-                            .where(Task.id == task.id)
-                            .values(result_branch=branch_name, instance_id=instance_id)
-                        )
-                        await db.commit()
-                except RuntimeError as e:
-                    logger.warning(f"Worktree creation failed, using repo directly: {e}")
-                    async with self.db_factory() as db:
-                        await db.execute(
-                            update(Task)
-                            .where(Task.id == task.id)
-                            .values(instance_id=instance_id)
-                        )
-                        await db.commit()
-
-                # Plan mode: first run with --permission-mode plan to get the plan
+                # Plan mode handling
                 if task.mode == "plan" and not task.plan_approved:
                     logger.info(f"Task {task.id} is in plan mode, running plan phase")
                     plan_prompt = f"Please analyze the following task and create a detailed plan. Do NOT execute any changes, only describe what you would do:\n\n{task.description}"
@@ -143,7 +124,7 @@ class RalphLoop:
                     })
                     continue  # Move to next task; this one waits for approval
 
-                # Normal execution (auto mode, or approved plan mode)
+                # Normal execution — Claude Code is fully autonomous
                 await self.instance_manager.launch(
                     instance_id=instance_id,
                     prompt=task.description,
@@ -180,21 +161,6 @@ class RalphLoop:
                     "new_status": status,
                     "instance_id": instance_id,
                 })
-
-                # Cleanup worktree
-                if worktree and exit_code == 0:
-                    try:
-                        merge_result = await self.worktree_manager.merge(worktree)
-                        async with self.db_factory() as db:
-                            await db.execute(
-                                update(Task)
-                                .where(Task.id == task.id)
-                                .values(merge_status=merge_result)
-                            )
-                            await db.commit()
-                        await self.worktree_manager.remove(worktree)
-                    except Exception as e:
-                        logger.error(f"Worktree merge/cleanup failed: {e}")
 
             except asyncio.CancelledError:
                 logger.info(f"Ralph loop cancelled for instance {instance_id}")

@@ -105,6 +105,16 @@
 - [x] 修复 chat.py 中 last_cwd 指向已清理 worktree 的 bug（添加 os.path.isdir 回退）
 - **Commit**: 55e967b
 
+### 阶段 15：Dispatcher 简化 — Git 操作全交给 Claude Code
+- [x] dispatcher.py 去掉 worktree_manager，不再创建/清理 worktree
+- [x] ralph_loop.py 去掉 worktree_manager，不再 merge/清理 worktree
+- [x] main.py 去掉 worktree_manager 单例注入
+- [x] CLAUDE.md 模板更新：步骤 2 改为 Claude Code 自己创建 worktree，步骤 8 改为自己清理
+- [x] 主项目 CLAUDE.md 同步更新生命周期描述
+- [x] chat.py 简化 cwd 逻辑（不再需要 worktree 路径 fallback）
+- [x] 测试同步更新（去掉 worktree_manager mock，更新 cwd 测试）
+- **Commit**: (待提交)
+
 ### 文档
 - [x] README.md
 - [x] CLAUDE.md
