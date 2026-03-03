@@ -11,13 +11,14 @@ def parser():
 
 
 def test_empty_line(parser):
-    assert parser.parse_line("") is None
-    assert parser.parse_line("   ") is None
+    assert parser.parse_line("") == []
+    assert parser.parse_line("   ") == []
 
 
 def test_invalid_json(parser):
-    result = parser.parse_line("not json at all")
-    assert result is not None
+    results = parser.parse_line("not json at all")
+    assert len(results) == 1
+    result = results[0]
     assert result["event_type"] == "parse_error"
     assert result["is_error"] is True
     assert result["content"] == "not json at all"
@@ -29,7 +30,7 @@ def test_system_init(parser):
         "subtype": "init",
         "session_id": "abc-123",
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "system_init"
     assert result["session_id"] == "abc-123"
 
@@ -39,7 +40,7 @@ def test_assistant_message(parser):
         "type": "assistant",
         "content": [{"type": "text", "text": "Hello world"}],
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "message"
     assert result["role"] == "assistant"
     assert result["content"] == "Hello world"
@@ -51,7 +52,7 @@ def test_tool_use(parser):
         "name": "Read",
         "input": {"file_path": "/tmp/test.py"},
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "tool_use"
     assert result["tool_name"] == "Read"
     assert '"file_path"' in result["tool_input"]
@@ -62,7 +63,7 @@ def test_tool_result(parser):
         "type": "tool_result",
         "content": "file contents here",
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "tool_result"
     assert result["tool_output"] == "file contents here"
     assert result["is_error"] is False
@@ -73,7 +74,7 @@ def test_tool_result_error(parser):
         "type": "tool_result",
         "content": "Error: file not found",
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["is_error"] is True
 
 
@@ -84,7 +85,7 @@ def test_result_with_cost(parser):
         "total_cost_usd": 0.42,
         "content": [{"type": "text", "text": "Done"}],
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "result"
     assert result["session_id"] == "sess-456"
     assert result["cost_usd"] == 0.42
@@ -97,13 +98,13 @@ def test_result_is_error(parser):
         "is_error": True,
         "content": "Something failed",
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["is_error"] is True
 
 
 def test_content_extraction_string(parser):
     line = json.dumps({"type": "unknown", "content": "plain string"})
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["content"] == "plain string"
 
 
@@ -115,13 +116,13 @@ def test_content_extraction_list(parser):
             {"type": "text", "text": "line 2"},
         ],
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["content"] == "line 1\nline 2"
 
 
 def test_content_extraction_empty_list(parser):
     line = json.dumps({"type": "unknown", "content": []})
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["content"] is None
 
 
@@ -130,7 +131,7 @@ def test_content_extraction_message_wrapper(parser):
         "type": "unknown",
         "message": {"content": [{"type": "text", "text": "nested"}]},
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["content"] == "nested"
 
 
@@ -143,7 +144,7 @@ def test_assistant_tool_use_block(parser):
             "content": [{"type": "tool_use", "id": "toolu_123", "name": "Bash", "input": {"command": "ls -la"}}],
         },
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "tool_use"
     assert result["tool_name"] == "Bash"
     assert '"command"' in result["tool_input"]
@@ -159,7 +160,7 @@ def test_assistant_thinking_block(parser):
             "content": [{"type": "thinking", "thinking": "Let me analyze this..."}],
         },
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "thinking"
     assert result["content"] == "Let me analyze this..."
     assert result["role"] == "assistant"
@@ -174,7 +175,7 @@ def test_user_event_tool_result(parser):
             "content": [{"type": "tool_result", "tool_use_id": "toolu_123", "content": "file contents here", "is_error": False}],
         },
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "tool_result"
     assert result["role"] == "tool"
     assert result["tool_output"] == "file contents here"
@@ -190,7 +191,7 @@ def test_user_event_tool_result_error(parser):
             "content": [{"type": "tool_result", "tool_use_id": "toolu_456", "content": "Error: not found", "is_error": True}],
         },
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "tool_result"
     assert result["is_error"] is True
 
@@ -202,7 +203,7 @@ def test_system_non_init(parser):
         "subtype": "task_started",
         "task_id": "abc",
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "system_event"
     assert result["content"] == "task_started"
 
@@ -213,5 +214,45 @@ def test_assistant_empty_content_blocks(parser):
         "type": "assistant",
         "message": {"role": "assistant", "content": []},
     })
-    result = parser.parse_line(line)
+    result = parser.parse_line(line)[0]
     assert result["event_type"] == "message"
+
+
+def test_assistant_multiple_content_blocks(parser):
+    """assistant event with text + tool_use blocks → multiple events."""
+    line = json.dumps({
+        "type": "assistant",
+        "message": {
+            "role": "assistant",
+            "content": [
+                {"type": "text", "text": "Let me edit the file."},
+                {"type": "tool_use", "id": "toolu_789", "name": "Edit", "input": {"file_path": "/tmp/a.py", "old_string": "foo", "new_string": "bar"}},
+            ],
+        },
+    })
+    results = parser.parse_line(line)
+    assert len(results) == 2
+    assert results[0]["event_type"] == "message"
+    assert results[0]["content"] == "Let me edit the file."
+    assert results[1]["event_type"] == "tool_use"
+    assert results[1]["tool_name"] == "Edit"
+
+
+def test_user_multiple_tool_results(parser):
+    """user event with multiple tool_result blocks → multiple events."""
+    line = json.dumps({
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_1", "content": "result 1"},
+                {"type": "tool_result", "tool_use_id": "toolu_2", "content": "result 2", "is_error": True},
+            ],
+        },
+    })
+    results = parser.parse_line(line)
+    assert len(results) == 2
+    assert results[0]["tool_output"] == "result 1"
+    assert results[0]["is_error"] is False
+    assert results[1]["tool_output"] == "result 2"
+    assert results[1]["is_error"] is True

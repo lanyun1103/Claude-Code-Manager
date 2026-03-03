@@ -96,60 +96,61 @@ class InstanceManager:
                 if not text:
                     continue
 
-                event = self.parser.parse_line(text)
-                if not event:
+                events = self.parser.parse_line(text)
+                if not events:
                     continue
 
-                # Extract session_id and save to task
-                session_id = event.pop("session_id", None)
-                cost_usd = event.pop("cost_usd", None)
-                if session_id and task_id:
+                for event in events:
+                    # Extract session_id and save to task
+                    session_id = event.pop("session_id", None)
+                    cost_usd = event.pop("cost_usd", None)
+                    if session_id and task_id:
+                        async with self.db_factory() as db:
+                            await db.execute(
+                                update(Task)
+                                .where(Task.id == task_id)
+                                .values(session_id=session_id)
+                            )
+                            await db.commit()
+                    if cost_usd is not None:
+                        async with self.db_factory() as db:
+                            await db.execute(
+                                update(Instance)
+                                .where(Instance.id == instance_id)
+                                .values(total_cost_usd=cost_usd)
+                            )
+                            await db.commit()
+
+                    # Store in DB
                     async with self.db_factory() as db:
-                        await db.execute(
-                            update(Task)
-                            .where(Task.id == task_id)
-                            .values(session_id=session_id)
+                        entry = LogEntry(
+                            instance_id=instance_id,
+                            task_id=task_id,
+                            event_type=event["event_type"],
+                            role=event.get("role"),
+                            content=event.get("content"),
+                            tool_name=event.get("tool_name"),
+                            tool_input=event.get("tool_input"),
+                            tool_output=event.get("tool_output"),
+                            raw_json=event.get("raw_json"),
+                            is_error=event.get("is_error", False),
                         )
+                        db.add(entry)
                         await db.commit()
-                if cost_usd is not None:
-                    async with self.db_factory() as db:
+
+                        # Update heartbeat
                         await db.execute(
                             update(Instance)
                             .where(Instance.id == instance_id)
-                            .values(total_cost_usd=cost_usd)
+                            .values(last_heartbeat=datetime.utcnow())
                         )
                         await db.commit()
 
-                # Store in DB
-                async with self.db_factory() as db:
-                    entry = LogEntry(
-                        instance_id=instance_id,
-                        task_id=task_id,
-                        event_type=event["event_type"],
-                        role=event.get("role"),
-                        content=event.get("content"),
-                        tool_name=event.get("tool_name"),
-                        tool_input=event.get("tool_input"),
-                        tool_output=event.get("tool_output"),
-                        raw_json=event.get("raw_json"),
-                        is_error=event.get("is_error", False),
-                    )
-                    db.add(entry)
-                    await db.commit()
-
-                    # Update heartbeat
-                    await db.execute(
-                        update(Instance)
-                        .where(Instance.id == instance_id)
-                        .values(last_heartbeat=datetime.utcnow())
-                    )
-                    await db.commit()
-
-                # Broadcast via WebSocket
-                broadcast_data = {k: v for k, v in event.items() if k != "raw_json"}
-                await self.broadcaster.broadcast(f"instance:{instance_id}", broadcast_data)
-                if task_id:
-                    await self.broadcaster.broadcast(f"task:{task_id}", broadcast_data)
+                    # Broadcast via WebSocket
+                    broadcast_data = {k: v for k, v in event.items() if k != "raw_json"}
+                    await self.broadcaster.broadcast(f"instance:{instance_id}", broadcast_data)
+                    if task_id:
+                        await self.broadcaster.broadcast(f"task:{task_id}", broadcast_data)
 
         except asyncio.CancelledError:
             pass
