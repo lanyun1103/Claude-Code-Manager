@@ -23,7 +23,7 @@ class TaskQueue:
     async def list_tasks(
         self, status: str | None = None, limit: int = 50, offset: int = 0
     ) -> list[Task]:
-        stmt = select(Task).order_by(Task.priority.asc(), Task.created_at.asc())
+        stmt = select(Task).order_by(Task.created_at.desc())
         if status:
             stmt = stmt.where(Task.status == status)
         stmt = stmt.limit(limit).offset(offset)
