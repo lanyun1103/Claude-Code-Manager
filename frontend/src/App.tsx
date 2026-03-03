@@ -34,7 +34,7 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: string |
 }
 
 function App() {
-  const [page, setPage] = useState('dashboard');
+  const [page, setPage] = useState('tasks');
   const [authenticated, setAuthenticated] = useState(false);
   const [checking, setChecking] = useState(true);
 
