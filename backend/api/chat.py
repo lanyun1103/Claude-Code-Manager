@@ -104,7 +104,7 @@ async def get_chat_history(
         select(LogEntry)
         .where(
             LogEntry.task_id == task_id,
-            LogEntry.event_type.in_(["user_message", "message", "result", "tool_use", "tool_result", "system_init", "process_exit"]),
+            LogEntry.event_type.in_(["user_message", "message", "result", "tool_use", "tool_result", "system_init", "system_event", "thinking", "process_exit"]),
         )
         .order_by(LogEntry.id.asc())
         .limit(limit)

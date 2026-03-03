@@ -20,7 +20,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
   // Load chat history
   useEffect(() => {
     api.getTaskChatHistory(task.id).then((msgs) => {
-      // Filter out empty assistant messages (partial streaming chunks)
+      // Filter out empty text messages (partial streaming chunks), keep tool/thinking/system events
       setMessages(msgs.filter((m) =>
         !((m.event_type === 'message' || m.event_type === 'result') && !m.content)
       ));
@@ -41,7 +41,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
     }
 
     // Only show meaningful events in chat (skip user_message - already added optimistically)
-    const showTypes = ['message', 'result', 'tool_use', 'tool_result', 'system_init'];
+    const showTypes = ['message', 'result', 'tool_use', 'tool_result', 'system_init', 'system_event', 'thinking'];
     if (!showTypes.includes(eventType)) return;
 
     const content = (msg.data.content as string) || null;
@@ -265,10 +265,31 @@ function MessageBubble({ message }: { message: ChatMessage }) {
     );
   }
 
-  if (message.event_type === 'system_init' || message.event_type === 'process_exit') {
+  if (message.event_type === 'thinking') {
+    return (
+      <div className="mx-4 px-3 py-2 bg-gray-800/30 rounded text-xs border border-gray-700/30">
+        <div className="flex items-center gap-1.5 text-gray-500">
+          <span>💭</span>
+          <span className="font-medium">Thinking</span>
+        </div>
+        {message.content && (
+          <div className="mt-1.5">
+            <CollapsibleContent content={message.content} maxLines={3} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (message.event_type === 'system_init' || message.event_type === 'process_exit' || message.event_type === 'system_event') {
+    const label = message.event_type === 'system_init'
+      ? '— Session started —'
+      : message.event_type === 'process_exit'
+        ? '— Done —'
+        : `— ${message.content || 'system'} —`;
     return (
       <div className="text-center text-xs text-gray-600 py-1">
-        {message.event_type === 'system_init' ? '— Session started —' : '— Done —'}
+        {label}
       </div>
     );
   }

@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.models.instance import Instance
 from backend.models.task import Task
+from backend.config import settings
 from backend.services.instance_manager import InstanceManager
 from backend.services.task_queue import TaskQueue
 from backend.services.ws_broadcaster import WebSocketBroadcaster
@@ -96,7 +97,12 @@ class RalphLoop:
                     )
                     process = self.instance_manager.processes.get(instance_id)
                     if process:
-                        await process.wait()
+                        try:
+                            await asyncio.wait_for(process.wait(), timeout=settings.task_timeout_seconds)
+                        except asyncio.TimeoutError:
+                            logger.warning(f"Plan phase for task {task.id} timed out, killing process")
+                            process.kill()
+                            await process.wait()
 
                     # Collect plan content from logs
                     async with self.db_factory() as db:
@@ -133,10 +139,15 @@ class RalphLoop:
                     model=None,
                 )
 
-                # Wait for process to finish
+                # Wait for process to finish (with timeout)
                 process = self.instance_manager.processes.get(instance_id)
                 if process:
-                    await process.wait()
+                    try:
+                        await asyncio.wait_for(process.wait(), timeout=settings.task_timeout_seconds)
+                    except asyncio.TimeoutError:
+                        logger.warning(f"Task {task.id} timed out after {settings.task_timeout_seconds}s, killing process")
+                        process.kill()
+                        await process.wait()
 
                 exit_code = process.returncode if process else -1
 

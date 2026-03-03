@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     auto_start_dispatcher: bool = True
     merge_push_retries: int = 3
     auto_push_to_origin: bool = True
+    task_timeout_seconds: int = 1800  # 30 minutes
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 

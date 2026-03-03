@@ -132,3 +132,86 @@ def test_content_extraction_message_wrapper(parser):
     })
     result = parser.parse_line(line)
     assert result["content"] == "nested"
+
+
+def test_assistant_tool_use_block(parser):
+    """assistant event with tool_use content block → tool_use event."""
+    line = json.dumps({
+        "type": "assistant",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "tool_use", "id": "toolu_123", "name": "Bash", "input": {"command": "ls -la"}}],
+        },
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "tool_use"
+    assert result["tool_name"] == "Bash"
+    assert '"command"' in result["tool_input"]
+    assert result["role"] == "assistant"
+
+
+def test_assistant_thinking_block(parser):
+    """assistant event with thinking content block → thinking event."""
+    line = json.dumps({
+        "type": "assistant",
+        "message": {
+            "role": "assistant",
+            "content": [{"type": "thinking", "thinking": "Let me analyze this..."}],
+        },
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "thinking"
+    assert result["content"] == "Let me analyze this..."
+    assert result["role"] == "assistant"
+
+
+def test_user_event_tool_result(parser):
+    """type: 'user' event with tool_result content → tool_result event."""
+    line = json.dumps({
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_123", "content": "file contents here", "is_error": False}],
+        },
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "tool_result"
+    assert result["role"] == "tool"
+    assert result["tool_output"] == "file contents here"
+    assert result["is_error"] is False
+
+
+def test_user_event_tool_result_error(parser):
+    """type: 'user' event with is_error flag → is_error set."""
+    line = json.dumps({
+        "type": "user",
+        "message": {
+            "role": "user",
+            "content": [{"type": "tool_result", "tool_use_id": "toolu_456", "content": "Error: not found", "is_error": True}],
+        },
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "tool_result"
+    assert result["is_error"] is True
+
+
+def test_system_non_init(parser):
+    """system event with non-init subtype → system_event."""
+    line = json.dumps({
+        "type": "system",
+        "subtype": "task_started",
+        "task_id": "abc",
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "system_event"
+    assert result["content"] == "task_started"
+
+
+def test_assistant_empty_content_blocks(parser):
+    """assistant event with empty content blocks → message event."""
+    line = json.dumps({
+        "type": "assistant",
+        "message": {"role": "assistant", "content": []},
+    })
+    result = parser.parse_line(line)
+    assert result["event_type"] == "message"

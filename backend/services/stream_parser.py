@@ -36,9 +36,50 @@ class StreamParser:
         if event_type == "system" and data.get("subtype") == "init":
             event["session_id"] = data.get("session_id")
             event["event_type"] = "system_init"
+        elif event_type == "system":
+            event["event_type"] = "system_event"
+            event["content"] = data.get("subtype", "system")
         elif event_type == "assistant":
             event["role"] = "assistant"
-            event["event_type"] = "message"
+            # Parse content blocks: may contain text, tool_use, or thinking
+            content_blocks = data.get("message", {}).get("content", []) if isinstance(data.get("message"), dict) else data.get("content", [])
+            if isinstance(content_blocks, list):
+                matched = False
+                for block in content_blocks:
+                    if not isinstance(block, dict):
+                        continue
+                    if block.get("type") == "tool_use":
+                        event["event_type"] = "tool_use"
+                        event["tool_name"] = block.get("name")
+                        event["tool_input"] = json.dumps(block.get("input", {}))
+                        matched = True
+                        break
+                    elif block.get("type") == "thinking":
+                        event["event_type"] = "thinking"
+                        event["content"] = block.get("thinking", "")
+                        matched = True
+                        break
+                    elif block.get("type") == "text":
+                        event["event_type"] = "message"
+                        event["content"] = block.get("text", "")
+                        matched = True
+                        break
+                if not matched:
+                    event["event_type"] = "message"
+            else:
+                event["event_type"] = "message"
+        elif event_type == "user":
+            # Claude Code sends tool results as type: "user" with tool_result content blocks
+            event["event_type"] = "tool_result"
+            event["role"] = "tool"
+            msg_content = data.get("message", {}).get("content", []) if isinstance(data.get("message"), dict) else []
+            if isinstance(msg_content, list):
+                for block in msg_content:
+                    if isinstance(block, dict) and block.get("type") == "tool_result":
+                        event["tool_output"] = block.get("content", "")
+                        if block.get("is_error"):
+                            event["is_error"] = True
+                        break
         elif event_type == "tool_use":
             event["tool_name"] = data.get("name")
             event["tool_input"] = json.dumps(data.get("input", {}))
