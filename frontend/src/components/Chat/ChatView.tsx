@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { api } from '../../api/client';
 import type { ChatMessage, Task } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -7,6 +7,34 @@ import { Send, ArrowLeft, Loader2, ChevronDown, ChevronRight } from 'lucide-reac
 interface ChatViewProps {
   task: Task;
   onBack: () => void;
+}
+
+type MessageGroup =
+  | { type: 'tool-group'; messages: ChatMessage[] }
+  | { type: 'single'; message: ChatMessage };
+
+function groupMessages(messages: ChatMessage[]): MessageGroup[] {
+  const groups: MessageGroup[] = [];
+  let toolBuf: ChatMessage[] = [];
+
+  const flushTools = () => {
+    if (toolBuf.length > 0) {
+      groups.push({ type: 'tool-group', messages: [...toolBuf] });
+      toolBuf = [];
+    }
+  };
+
+  for (const msg of messages) {
+    const isTool = msg.event_type === 'tool_use' || msg.event_type === 'tool_result';
+    if (isTool) {
+      toolBuf.push(msg);
+    } else {
+      flushTools();
+      groups.push({ type: 'single', message: msg });
+    }
+  }
+  flushTools();
+  return groups;
 }
 
 export function ChatView({ task, onBack }: ChatViewProps) {
@@ -62,6 +90,8 @@ export function ChatView({ task, onBack }: ChatViewProps) {
     setMessages((prev) => [...prev, entry]);
   }, [lastMessage, task.id]);
 
+  const grouped = useMemo(() => groupMessages(messages), [messages]);
+
   // Auto-scroll
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -112,9 +142,9 @@ export function ChatView({ task, onBack }: ChatViewProps) {
           <ArrowLeft size={20} />
         </button>
         <div className="flex-1 min-w-0">
-          <h3 className="text-white font-medium text-sm truncate">{task.title}</h3>
+          <p className="text-white font-medium text-sm truncate">Task #{task.id}</p>
           <p className="text-xs text-gray-500">
-            Task #{task.id} · {task.session_id ? 'Session active' : 'No session yet'}
+            {task.session_id ? 'Session active' : 'No session yet'}
           </p>
         </div>
       </div>
@@ -131,9 +161,13 @@ export function ChatView({ task, onBack }: ChatViewProps) {
             </p>
           </div>
         )}
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
+        {grouped.map((group, i) =>
+          group.type === 'tool-group' ? (
+            <ToolGroup key={i} messages={group.messages} />
+          ) : (
+            <MessageBubble key={group.message.id} message={group.message} />
+          )
+        )}
         {sending && (
           <div className="flex gap-2 items-center text-gray-500 text-sm px-3">
             <Loader2 size={14} className="animate-spin" />
@@ -189,13 +223,13 @@ function CollapsibleContent({ content, maxLines = 5 }: { content: string; maxLin
 
   if (!shouldCollapse) {
     return (
-      <pre className="text-gray-300 whitespace-pre-wrap text-xs overflow-x-auto">{content}</pre>
+      <pre className="text-gray-400 whitespace-pre-wrap text-xs overflow-x-auto">{content}</pre>
     );
   }
 
   return (
     <div>
-      <pre className={`text-gray-300 whitespace-pre-wrap text-xs overflow-x-auto ${expanded ? 'max-h-96 overflow-y-auto' : 'max-h-28 overflow-hidden'}`}>
+      <pre className={`text-gray-400 whitespace-pre-wrap text-xs overflow-x-auto ${expanded ? 'max-h-96 overflow-y-auto' : 'max-h-28 overflow-hidden'}`}>
         {content}
       </pre>
       <button
@@ -230,40 +264,107 @@ function formatToolInput(input: string): string {
   }
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
-  const isUser = message.role === 'user';
-  const isTool = message.event_type === 'tool_use' || message.event_type === 'tool_result';
-
-  if (isTool) {
-    const isToolUse = message.event_type === 'tool_use';
-    const icon = isToolUse ? '🔧' : '📋';
-    const label = isToolUse ? message.tool_name || 'tool_use' : message.tool_name || 'tool_result';
-    const borderColor = message.is_error ? 'border-red-500/30' : 'border-gray-700/50';
-
-    // Determine the content to show
-    let detail: string | null = null;
-    if (isToolUse && message.tool_input) {
-      detail = formatToolInput(message.tool_input);
-    } else if (!isToolUse && (message.tool_output || message.content)) {
-      detail = message.tool_output || message.content;
-    } else if (message.content) {
-      detail = message.content;
+/** Extract a short one-line summary for a tool_use message */
+function toolUseSummary(msg: ChatMessage): string {
+  if (!msg.tool_input) return '';
+  try {
+    const parsed = JSON.parse(msg.tool_input);
+    if (parsed.command) {
+      const cmd = parsed.command as string;
+      return cmd.length > 80 ? cmd.slice(0, 80) + '...' : cmd;
     }
+    if (parsed.file_path) return parsed.file_path as string;
+    if (parsed.pattern) return `${parsed.pattern}${parsed.path ? ` in ${parsed.path}` : ''}`;
+  } catch { /* ignore */ }
+  return '';
+}
 
-    return (
-      <div className={`mx-4 px-3 py-2 bg-gray-800/50 rounded text-xs border ${borderColor}`}>
-        <div className="flex items-center gap-1.5">
-          <span className="text-gray-500">{icon}</span>
-          <span className="text-blue-400 font-medium">{label}</span>
+function ToolGroup({ messages }: { messages: ChatMessage[] }) {
+  const [expanded, setExpanded] = useState(false);
+  const hasError = messages.some((m) => m.is_error);
+  const toolUseCount = messages.filter((m) => m.event_type === 'tool_use').length;
+
+  return (
+    <div className="mx-4">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className={`flex items-center gap-1.5 text-xs py-1 hover:text-gray-400 transition-colors ${hasError ? 'text-red-400/70' : 'text-gray-600'}`}
+      >
+        {expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+        <span>
+          {hasError ? '⚠' : '🔧'} {toolUseCount} tool call{toolUseCount !== 1 ? 's' : ''}
+        </span>
+      </button>
+      {expanded && (
+        <div className="ml-3 border-l border-gray-800 pl-3 space-y-1 mt-1">
+          {messages.map((msg) => (
+            <ToolItem key={msg.id} message={msg} />
+          ))}
         </div>
-        {detail && (
-          <div className="mt-1.5">
+      )}
+    </div>
+  );
+}
+
+function ToolItem({ message }: { message: ChatMessage }) {
+  const [expanded, setExpanded] = useState(false);
+  const isToolUse = message.event_type === 'tool_use';
+  const toolName = message.tool_name || (isToolUse ? 'tool' : 'result');
+
+  let detail: string | null = null;
+  if (isToolUse && message.tool_input) {
+    detail = formatToolInput(message.tool_input);
+  } else if (!isToolUse && (message.tool_output || message.content)) {
+    detail = message.tool_output || message.content;
+  } else if (message.content) {
+    detail = message.content;
+  }
+
+  if (isToolUse) {
+    const summary = toolUseSummary(message);
+    return (
+      <div>
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-400 py-0.5 max-w-full"
+        >
+          {expanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
+          <span className="text-gray-500 font-medium">{toolName}</span>
+          {summary && <span className="text-gray-600 truncate">{summary}</span>}
+        </button>
+        {expanded && detail && (
+          <div className="ml-4 mt-1 mb-1">
             <CollapsibleContent content={detail} />
           </div>
         )}
       </div>
     );
   }
+
+  // tool_result
+  const statusIcon = message.is_error ? '✗' : '✓';
+  const statusColor = message.is_error ? 'text-red-400' : 'text-green-600';
+  return (
+    <div>
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-gray-400 py-0.5"
+      >
+        {expanded ? <ChevronDown size={10} className="shrink-0" /> : <ChevronRight size={10} className="shrink-0" />}
+        <span className={statusColor}>{statusIcon}</span>
+        <span className="text-gray-600">{toolName}</span>
+      </button>
+      {expanded && detail && (
+        <div className="ml-4 mt-1 mb-1">
+          <CollapsibleContent content={detail} />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MessageBubble({ message }: { message: ChatMessage }) {
+  const isUser = message.role === 'user';
 
   if (message.event_type === 'thinking') {
     return (
