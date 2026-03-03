@@ -10,7 +10,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
   ];
 
   return (
-    <header className="bg-gray-900 border-b border-gray-700 px-4 py-2 flex items-center gap-3 flex-wrap">
+    <header className="bg-gray-900 border-b border-gray-700 px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] flex items-center gap-3 flex-wrap">
       <h1 className="text-base font-bold text-white">Claude Manager</h1>
       <nav className="flex gap-2">
         {pages.map((p) => (
