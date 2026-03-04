@@ -57,8 +57,8 @@ export function InstanceLog({ instanceId, onClose }: InstanceLogProps) {
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
       <div className="bg-gray-900 rounded-lg w-full max-w-3xl max-h-[80vh] flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
-          <h3 className="text-white font-medium text-sm">Instance #{instanceId} Logs</h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-white">
+          <h3 className="text-foreground font-medium text-sm">Instance #{instanceId} Logs</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-foreground">
             <X size={18} />
           </button>
         </div>

@@ -97,7 +97,7 @@ function App() {
 
   return (
     <ErrorBoundary>
-      <div className="min-h-screen bg-gray-900 text-white flex flex-col">
+      <div className="min-h-screen bg-gray-900 text-foreground flex flex-col">
         <Header currentPage={page} onNavigate={setPage} />
         <main className="flex-1 max-w-6xl mx-auto w-full p-4">
           {page === 'dashboard' && <Dashboard />}

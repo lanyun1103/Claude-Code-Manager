@@ -57,7 +57,7 @@ export function InstanceGrid({ instances, onRefresh, onViewLogs }: InstanceGridP
     <div className="space-y-3">
       <div className="flex gap-2">
         <input
-          className="flex-1 bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Instance name (optional)"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -87,7 +87,7 @@ export function InstanceGrid({ instances, onRefresh, onViewLogs }: InstanceGridP
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className={`w-2.5 h-2.5 rounded-full ${statusColors[inst.status] || 'bg-gray-500'}`} />
-                <span className="text-white font-medium text-sm">{inst.name}</span>
+                <span className="text-foreground font-medium text-sm">{inst.name}</span>
               </div>
               <span className="text-xs text-gray-500">#{inst.id}</span>
             </div>

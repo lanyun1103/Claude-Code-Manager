@@ -24,7 +24,7 @@ export function PlanPanel({ tasks, onRefresh }: PlanPanelProps) {
 
   return (
     <div className="space-y-3">
-      <h2 className="text-white font-semibold flex items-center gap-2">
+      <h2 className="text-foreground font-semibold flex items-center gap-2">
         Plans Awaiting Review
         <span className="bg-yellow-500 text-black text-xs px-2 py-0.5 rounded-full font-bold">{planTasks.length}</span>
       </h2>
@@ -32,7 +32,7 @@ export function PlanPanel({ tasks, onRefresh }: PlanPanelProps) {
         <div key={task.id} className="bg-gray-800 rounded-lg p-4 space-y-3">
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-white font-medium text-sm">{task.title}</span>
+              <span className="text-foreground font-medium text-sm">{task.title}</span>
               <span className="text-gray-500 text-xs ml-2">#{task.id}</span>
             </div>
             <div className="flex gap-2">

@@ -138,11 +138,11 @@ export function ChatView({ task, onBack }: ChatViewProps) {
     <div className="fixed inset-0 bg-gray-950 flex flex-col z-50">
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-gray-800 bg-gray-900">
-        <button onClick={onBack} className="text-gray-400 hover:text-white">
+        <button onClick={onBack} className="text-gray-400 hover:text-foreground">
           <ArrowLeft size={20} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-white font-medium text-sm truncate">Task #{task.id}</p>
+          <p className="text-foreground font-medium text-sm truncate">Task #{task.id}</p>
           <p className="text-xs text-gray-500">
             {task.session_id ? 'Session active' : 'No session yet'}
           </p>
@@ -200,7 +200,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
             }
             disabled={sending || !task.session_id}
             rows={1}
-            className="flex-1 bg-gray-800 text-white rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none disabled:opacity-50 max-h-32"
+            className="flex-1 bg-gray-800 text-foreground rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none disabled:opacity-50 max-h-32"
             style={{ minHeight: '40px' }}
           />
           <button

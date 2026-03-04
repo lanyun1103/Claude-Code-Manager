@@ -84,7 +84,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
       <h3 className="text-sm font-semibold text-gray-300">New Task</h3>
       <div className="flex gap-2">
         <textarea
-          className="flex-1 bg-gray-700 text-white rounded px-3 py-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="flex-1 bg-gray-700 text-foreground rounded px-3 py-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="Prompt / Description (this will be sent to Claude Code)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -94,7 +94,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
       </div>
       <div className="space-y-2">
         <select
-          className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={isNewProject ? NEW_PROJECT_VALUE : projectId}
           onChange={(e) => handleProjectChange(e.target.value)}
         >
@@ -109,14 +109,14 @@ export function TaskForm({ onCreated }: TaskFormProps) {
         {isNewProject && (
           <div className="flex gap-2">
             <input
-              className="flex-1 bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Project name (required)"
               value={newProjectName}
               onChange={(e) => setNewProjectName(e.target.value)}
               required
             />
             <input
-              className="flex-1 bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="flex-1 bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               placeholder="Remote repo URL (optional)"
               value={newProjectUrl}
               onChange={(e) => setNewProjectUrl(e.target.value)}
@@ -128,13 +128,13 @@ export function TaskForm({ onCreated }: TaskFormProps) {
         <label className="text-sm text-gray-400">Priority:</label>
         <input
           type="number"
-          className="w-20 bg-gray-700 text-white rounded px-2 py-1 text-sm"
+          className="w-20 bg-gray-700 text-foreground rounded px-2 py-1 text-sm"
           value={priority}
           onChange={(e) => setPriority(Number(e.target.value))}
         />
         <label className="text-sm text-gray-400 ml-2">Mode:</label>
         <select
-          className="bg-gray-700 text-white rounded px-2 py-1 text-sm"
+          className="bg-gray-700 text-foreground rounded px-2 py-1 text-sm"
           value={mode}
           onChange={(e) => setMode(e.target.value)}
         >

@@ -39,7 +39,7 @@ export function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {Object.entries(stats.tasks).map(([status, count]) => (
             <div key={status} className="bg-gray-800 rounded-lg p-3 text-center">
-              <p className="text-2xl font-bold text-white">{count}</p>
+              <p className="text-2xl font-bold text-foreground">{count}</p>
               <p className="text-xs text-gray-400 capitalize">{status}</p>
             </div>
           ))}
@@ -52,7 +52,7 @@ export function Dashboard() {
 
       {/* Instances */}
       <div>
-        <h2 className="text-white font-semibold mb-3">Instances</h2>
+        <h2 className="text-foreground font-semibold mb-3">Instances</h2>
         <InstanceGrid
           instances={instances}
           onRefresh={refresh}

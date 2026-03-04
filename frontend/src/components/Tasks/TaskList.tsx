@@ -58,7 +58,7 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
               )}
               <span className="text-xs text-gray-500 capitalize">{t.status.replace('_', ' ')}</span>
             </div>
-            <p className="text-white text-sm mt-0.5 line-clamp-2">{t.description}</p>
+            <p className="text-foreground text-sm mt-0.5 line-clamp-2">{t.description}</p>
             {t.target_repo && (
               <p className="text-gray-600 text-xs mt-0.5 truncate">{t.target_repo}</p>
             )}

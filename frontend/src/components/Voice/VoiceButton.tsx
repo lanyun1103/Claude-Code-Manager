@@ -76,7 +76,7 @@ export function VoiceButton({ onTranscribed }: VoiceButtonProps) {
           ? 'bg-red-500 text-white animate-pulse'
           : loading
             ? 'bg-gray-600 text-gray-400'
-            : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-white'
+            : 'bg-gray-700 text-gray-300 hover:bg-gray-600 hover:text-foreground'
       }`}
       title={recording ? 'Stop recording' : loading ? 'Transcribing...' : 'Voice input'}
     >

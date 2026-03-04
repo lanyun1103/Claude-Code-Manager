@@ -46,11 +46,11 @@ export function ServerConfigPage({ onConfigured }: ServerConfigPageProps) {
   return (
     <div className="min-h-screen bg-gray-950 flex items-center justify-center p-4">
       <div className="bg-gray-800 rounded-lg p-6 w-full max-w-sm space-y-4">
-        <h1 className="text-white text-lg font-bold text-center">Claude Code Manager</h1>
+        <h1 className="text-foreground text-lg font-bold text-center">Claude Code Manager</h1>
         <p className="text-gray-400 text-sm text-center">Enter your server address</p>
         <input
           type="url"
-          className="w-full bg-gray-700 text-white rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          className="w-full bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           placeholder="https://ccm.example.com"
           value={url}
           onChange={(e) => { setUrl(e.target.value); setSuccess(false); setError(''); }}
