@@ -114,6 +114,9 @@ async def get_chat_history(
 
     messages = []
     for entry in entries:
+        # Skip heartbeat events
+        if entry.event_type == "system_event" and entry.content == "task_progress":
+            continue
         messages.append({
             "id": entry.id,
             "role": entry.role or ("assistant" if entry.event_type in ("message", "result") else "system"),

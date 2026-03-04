@@ -47,12 +47,15 @@ class InstanceManager:
         # Must unset CLAUDE_CODE env var to avoid nested session detection
         env = {k: v for k, v in os.environ.items() if k.upper() not in ("CLAUDECODE", "CLAUDE_CODE")}
 
+        # Claude Code can output very large NDJSON lines (e.g. Read tool with big files).
+        # Default asyncio limit is 64KB which causes LimitOverrunError and kills the consumer.
         process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
             cwd=cwd or os.getcwd(),
             env=env,
+            limit=10 * 1024 * 1024,  # 10MB line buffer
         )
 
         self.processes[instance_id] = process
@@ -92,7 +95,12 @@ class InstanceManager:
         """Read NDJSON lines from stdout, parse, store, and broadcast."""
         try:
             while True:
-                line = await process.stdout.readline()
+                try:
+                    line = await process.stdout.readline()
+                except (ValueError, asyncio.LimitOverrunError) as e:
+                    # Line exceeds buffer limit — skip it and continue reading
+                    logger.warning("Skipping oversized NDJSON line for instance %s: %s", instance_id, e)
+                    continue
                 if not line:
                     break
                 text = line.decode("utf-8", errors="replace").strip()
