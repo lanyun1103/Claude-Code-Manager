@@ -52,9 +52,11 @@ claude-manager/
 │       └── whisper_client.py    # OpenAI Whisper 客户端
 ├── frontend/
 │   └── src/
-│       ├── api/client.ts        # API 客户端 + 类型 (401 自动登出)
+│       ├── api/client.ts        # API 客户端 + 类型 (401 自动登出, 动态 base URL)
 │       ├── api/ws.ts            # WebSocket 客户端 (指数退避重连)
-│       ├── pages/               # Dashboard, TasksPage, LoginPage
+│       ├── config/server.ts     # 远程服务器 URL 配置 (Capacitor/Android 支持)
+│       ├── config/theme.ts      # 浅色/深色主题切换 (localStorage 持久化)
+│       ├── pages/               # Dashboard, TasksPage, LoginPage, ServerConfigPage
 │       ├── components/
 │       │   ├── Chat/ChatView.tsx       # 多轮对话 UI (基于 task)
 │       │   ├── Instances/              # InstanceGrid, InstanceLog
@@ -81,6 +83,8 @@ claude-manager/
 - **认证**: 除 `/api/system/health` 和 `/api/auth/login` 外，所有 API 需要 `Authorization: Bearer <token>`
 - **前端 type 导入**: 用 `import type { X }` 导入类型，`import { api }` 导入值（Vite 会去除 type-only exports）
 - **Tailwind v4**: 用 `@import "tailwindcss"` + `@tailwindcss/vite` 插件，无 tailwind.config
+- **主题**: 深色/浅色切换通过覆盖 `--color-gray-*` CSS 变量实现灰度反转，内容文字用 `text-foreground`（随主题变化），按钮文字保持 `text-white`
+- **Android App**: Capacitor 打包，API/WS 地址通过 `config/server.ts` 动态获取，LoginPage 可展开配置 Server URL
 - **调度器**: `GlobalDispatcher` 只负责分配任务、启动 Claude Code、判断成败。所有 git 操作（worktree、commit、merge、push）全由 Claude Code 自主完成
 - **任务生命周期**: pending → in_progress → executing → completed（失败回 pending 重试）
 - **项目**: `Project` 模型管理 git repo，支持 clone 已有仓库（has_remote=True）和本地 git init（has_remote=False）

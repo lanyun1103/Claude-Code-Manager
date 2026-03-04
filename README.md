@@ -16,6 +16,8 @@ Web 端调度和管理多个 Claude Code 实例并行工作。灵感来自胡渊
 - **Plan Mode** — 敏感任务先生成计划，人工审批后再执行
 - **语音输入** — 通过 OpenAI Whisper API 语音转文字创建任务
 - **PWA** — 手机浏览器 Add to Home Screen，原生 App 体验
+- **Android App** — 通过 Capacitor 打包原生 APK，App 内可配置远程服务器地址
+- **主题切换** — 支持浅色/深色主题，偏好持久化
 - **Token 认证** — Bearer Token 保护所有 API，安全远程访问
 - **远程访问** — 通过 ngrok / Cloudflare Tunnel 隧道暴露到公网
 
@@ -76,8 +78,9 @@ claude-manager/
 │   └── src/
 │       ├── api/         # HTTP + WebSocket 客户端
 │       ├── components/  # Chat, Instances, Tasks, PlanReview, Voice
+│       ├── config/      # server (远程服务器配置), theme (主题切换)
 │       ├── hooks/       # useWebSocket
-│       └── pages/       # Dashboard, TasksPage, LoginPage
+│       └── pages/       # Dashboard, TasksPage, LoginPage, ServerConfigPage
 ├── scripts/
 │   ├── dev.sh           # 一键启动开发环境
 │   └── tunnel.sh        # ngrok 隧道
@@ -145,6 +148,25 @@ ngrok http 8000
 ```
 
 用 ngrok 给出的 https URL 从手机访问。
+
+### Android App 打包
+
+```bash
+cd frontend
+
+# 安装 Capacitor（已在 package.json 中）
+npm install
+
+# 构建 + 同步 + 打包 APK
+npm run build
+npx cap sync android
+JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
+  android/gradlew -p android assembleDebug
+
+# APK 位于 android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+首次打开 App 在登录页展开 "Server URL" 输入服务器地址（如 Cloudflare Tunnel URL），然后输入 Token 登录。
 
 ## 使用流程
 
