@@ -137,7 +137,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
   return (
     <div className="fixed inset-0 bg-gray-950 flex flex-col z-50">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-800 bg-gray-900">
+      <div className="flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-gray-800 bg-gray-900">
         <button onClick={onBack} className="text-gray-400 hover:text-white">
           <ArrowLeft size={20} />
         </button>

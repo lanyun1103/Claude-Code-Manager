@@ -152,8 +152,12 @@ uv run python -m pytest backend/tests/ -v
 cd frontend && npm run build && cd ..
 uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
-# 公网隧道
-cloudflared tunnel --url http://localhost:8000
+# 公网部署 (Cloudflare Tunnel)
+# 首次设置: cloudflared tunnel login → create → route dns → 编写 ~/.cloudflared/config.yml
+# 每次部署:
+cd frontend && npm run build && cd ..
+uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000  # 终端1
+cloudflared tunnel run <tunnel-name>                          # 终端2
 ```
 
 ## 数据库
