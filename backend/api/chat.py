@@ -92,7 +92,7 @@ async def send_chat_message(
 @router.get("/{task_id}/chat/history")
 async def get_chat_history(
     task_id: int,
-    limit: int = 200,
+    limit: int = 500,
     db: AsyncSession = Depends(get_db),
 ):
     """Get chat-formatted history for a task (user messages + assistant responses)."""
@@ -100,17 +100,18 @@ async def get_chat_history(
     if not task:
         raise HTTPException(404, "Task not found")
 
+    # Fetch the most recent N messages (desc) then reverse to chronological order
     stmt = (
         select(LogEntry)
         .where(
             LogEntry.task_id == task_id,
             LogEntry.event_type.in_(["user_message", "message", "result", "tool_use", "tool_result", "system_init", "system_event", "thinking", "process_exit"]),
         )
-        .order_by(LogEntry.id.asc())
+        .order_by(LogEntry.id.desc())
         .limit(limit)
     )
     result = await db.execute(stmt)
-    entries = result.scalars().all()
+    entries = list(reversed(result.scalars().all()))
 
     messages = []
     for entry in entries:

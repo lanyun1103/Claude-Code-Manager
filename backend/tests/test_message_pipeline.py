@@ -632,7 +632,9 @@ async def test_chat_history_limit(client, session_factory):
     resp = await client.get(f"/api/tasks/{task_id}/chat/history?limit=3")
     msgs = resp.json()
     assert len(msgs) == 3
-    assert msgs[0]["content"] == "msg-0"
+    # limit returns the most recent N messages in chronological order
+    assert msgs[0]["content"] == "msg-7"
+    assert msgs[2]["content"] == "msg-9"
 
 
 @pytest.mark.asyncio
