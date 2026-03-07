@@ -18,6 +18,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
   const [newProjectUrl, setNewProjectUrl] = useState('');
   const [priority, setPriority] = useState(0);
   const [mode, setMode] = useState('auto');
+  const [todoFilePath, setTodoFilePath] = useState('');
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
 
@@ -41,7 +42,10 @@ export function TaskForm({ onCreated }: TaskFormProps) {
     }
   };
 
-  const canSubmit = description && (projectId || (isNewProject && newProjectName));
+  const canSubmit =
+    (description || mode === 'loop') &&
+    (mode !== 'loop' || todoFilePath) &&
+    (projectId || (isNewProject && newProjectName));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,10 +70,11 @@ export function TaskForm({ onCreated }: TaskFormProps) {
       }
 
       await api.createTask({
-        description,
+        description: description || undefined,
         project_id: pid as number,
         priority,
         mode,
+        ...(mode === 'loop' ? { todo_file_path: todoFilePath } : {}),
       });
       setDescription('');
       setPriority(0);
@@ -85,10 +90,10 @@ export function TaskForm({ onCreated }: TaskFormProps) {
       <div className="flex gap-2">
         <textarea
           className="flex-1 bg-gray-700 text-foreground rounded px-3 py-2 text-sm h-24 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          placeholder="Prompt / Description (this will be sent to Claude Code)"
+          placeholder={mode === 'loop' ? 'Background / context (optional)' : 'Prompt / Description (this will be sent to Claude Code)'}
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          required
+          required={mode !== 'loop'}
         />
         <VoiceButton onTranscribed={(text) => setDescription((prev) => prev ? prev + ' ' + text : text)} />
       </div>
@@ -140,7 +145,17 @@ export function TaskForm({ onCreated }: TaskFormProps) {
         >
           <option value="auto">Auto (direct execute)</option>
           <option value="plan">Plan (review first)</option>
+          <option value="loop">Loop (todo list)</option>
         </select>
+        {mode === 'loop' && (
+          <input
+            className="flex-1 min-w-0 bg-gray-700 text-foreground rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            placeholder="Todo file path (e.g. TODO.md)"
+            value={todoFilePath}
+            onChange={(e) => setTodoFilePath(e.target.value)}
+            required
+          />
+        )}
         <button
           type="submit"
           disabled={loading || !canSubmit}

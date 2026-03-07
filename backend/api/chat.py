@@ -127,6 +127,7 @@ async def get_chat_history(
             "tool_input": entry.tool_input,
             "tool_output": entry.tool_output,
             "is_error": entry.is_error,
+            "loop_iteration": entry.loop_iteration,
             "timestamp": entry.timestamp.isoformat() if entry.timestamp else None,
         })
 

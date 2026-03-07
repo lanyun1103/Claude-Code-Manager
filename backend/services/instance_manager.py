@@ -27,10 +27,12 @@ class InstanceManager:
         self.processes: dict[int, asyncio.subprocess.Process] = {}
         self._tasks: dict[int, asyncio.Task] = {}  # instance_id -> consumer task
 
-    async def launch(self, instance_id: int, prompt: str, task_id: int | None = None, cwd: str | None = None, model: str | None = None, resume_session_id: str | None = None) -> int:
+    async def launch(self, instance_id: int, prompt: str, task_id: int | None = None, cwd: str | None = None, model: str | None = None, resume_session_id: str | None = None, loop_iteration: int | None = None) -> int:
         """Launch a Claude Code subprocess for the given instance.
 
         If resume_session_id is provided, uses --resume to continue the conversation.
+        loop_iteration is recorded on every LogEntry produced by this invocation so
+        that loop-task chat history can be grouped by iteration in the frontend.
         """
         cmd = [
             settings.claude_binary,
@@ -85,13 +87,13 @@ class InstanceManager:
 
         # Start consuming stdout
         consumer = asyncio.create_task(
-            self._consume_output(instance_id, task_id, process)
+            self._consume_output(instance_id, task_id, process, loop_iteration)
         )
         self._tasks[instance_id] = consumer
 
         return process.pid
 
-    async def _consume_output(self, instance_id: int, task_id: int | None, process: asyncio.subprocess.Process):
+    async def _consume_output(self, instance_id: int, task_id: int | None, process: asyncio.subprocess.Process, loop_iteration: int | None = None):
         """Read NDJSON lines from stdout, parse, store, and broadcast.
 
         This method MUST keep running until the process closes stdout (EOF).
@@ -114,7 +116,7 @@ class InstanceManager:
 
                     for event in events:
                         try:
-                            await self._process_event(instance_id, task_id, event)
+                            await self._process_event(instance_id, task_id, event, loop_iteration)
                         except Exception:
                             logger.exception("Failed to process event for instance %s task %s: %s", instance_id, task_id, event.get("event_type"))
                 except asyncio.CancelledError:
@@ -175,7 +177,7 @@ class InstanceManager:
             self.processes.pop(instance_id, None)
             self._tasks.pop(instance_id, None)
 
-    async def _process_event(self, instance_id: int, task_id: int | None, event: dict):
+    async def _process_event(self, instance_id: int, task_id: int | None, event: dict, loop_iteration: int | None = None):
         """Process a single parsed event: save to DB and broadcast."""
         # Extract session_id and save to task
         session_id = event.pop("session_id", None)
@@ -210,6 +212,7 @@ class InstanceManager:
                 tool_output=event.get("tool_output"),
                 raw_json=event.get("raw_json"),
                 is_error=event.get("is_error", False),
+                loop_iteration=loop_iteration,
             )
             db.add(entry)
             await db.commit()

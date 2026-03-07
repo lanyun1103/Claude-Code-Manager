@@ -166,11 +166,18 @@ cloudflared tunnel run <tunnel-name>                          # 终端2
 
 ## 数据库
 
-SQLite 位于 `./claude_manager.db`，首次启动时通过 `init_db()` 自动创建。
+SQLite 位于 `./claude_manager.db`，使用 **Alembic** 管理 schema 版本。`init_db()` 在启动时自动执行 `alembic upgrade head`，无需手动操作。
 
-Schema 变更需删除 DB 文件重建（暂无迁移）：
+**Schema 变更流程**（详见 [DATABASE.md](./DATABASE.md)）：
+1. 修改 `backend/models/` 中的模型
+2. `uv run alembic revision --autogenerate -m "描述"` 生成 migration
+3. 测试：upgrade → downgrade → upgrade 全通过后提交
+4. migration 文件与模型修改**同一个 commit** 提交
+
 ```bash
-rm claude_manager.db  # 下次启动自动重建
+uv run alembic upgrade head    # 手动升级（通常不需要，启动自动执行）
+uv run alembic current         # 查看当前版本
+uv run alembic history         # 查看历史
 ```
 
 ## 文件维护规则

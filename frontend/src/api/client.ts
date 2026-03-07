@@ -53,7 +53,7 @@ export interface Project {
 export interface Task {
   id: number;
   title: string;
-  description: string;
+  description: string | null;
   status: string;
   priority: number;
   project_id: number | null;
@@ -65,6 +65,8 @@ export interface Task {
   retry_count: number;
   max_retries: number;
   mode: string;
+  todo_file_path: string | null;
+  loop_progress: string | null;
   plan_content: string | null;
   plan_approved: boolean | null;
   session_id: string | null;
@@ -98,6 +100,7 @@ export interface ChatMessage {
   tool_input: string | null;
   tool_output: string | null;
   is_error: boolean;
+  loop_iteration: number | null;
   timestamp: string | null;
 }
 
@@ -124,7 +127,7 @@ export const api = {
   // Tasks
   listTasks: (status?: string) =>
     request<Task[]>(`/api/tasks${status ? `?status=${status}` : ''}`),
-  createTask: (data: { title?: string; description: string; project_id?: number; priority?: number; target_branch?: string; mode?: string }) =>
+  createTask: (data: { title?: string; description?: string; project_id?: number; priority?: number; target_branch?: string; mode?: string; todo_file_path?: string }) =>
     request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
   deleteTask: (id: number) =>
     request<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' }),

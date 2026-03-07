@@ -1,18 +1,27 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 
 class TaskCreate(BaseModel):
     title: str = ""
-    description: str
+    description: str = ""
     project_id: int | None = None
     target_repo: str | None = None
     target_branch: str = "main"
     priority: int = 0
     max_retries: int = 2
-    mode: str = "auto"  # "auto" or "plan"
+    mode: str = "auto"  # "auto", "plan", or "loop"
+    todo_file_path: str | None = None  # required when mode="loop"
     tags: list[str] | None = None
+
+    @model_validator(mode='after')
+    def validate_mode_fields(self):
+        if self.mode != 'loop' and not self.description:
+            raise ValueError('description is required for non-loop tasks')
+        if self.mode == 'loop' and not self.todo_file_path:
+            raise ValueError('todo_file_path is required for loop tasks')
+        return self
 
 
 class TaskUpdate(BaseModel):
@@ -30,7 +39,7 @@ class TaskUpdate(BaseModel):
 class TaskResponse(BaseModel):
     id: int
     title: str
-    description: str
+    description: str | None
     status: str
     priority: int
     project_id: int | None
@@ -42,6 +51,8 @@ class TaskResponse(BaseModel):
     retry_count: int
     max_retries: int
     mode: str
+    todo_file_path: str | None
+    loop_progress: str | None
     plan_content: str | None
     plan_approved: bool | None
     session_id: str | None

@@ -5,6 +5,7 @@ import { TaskForm } from '../components/Tasks/TaskForm';
 import { TaskList } from '../components/Tasks/TaskList';
 import { PlanPanel } from '../components/PlanReview/PlanPanel';
 import { ChatView } from '../components/Chat/ChatView';
+import { LoopChatView } from '../components/Chat/LoopChatView';
 
 export function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -68,7 +69,10 @@ export function TasksPage() {
 
       <TaskList tasks={tasks} projects={projects} onRefresh={refresh} onOpenChat={(t) => setChatTask(t)} />
 
-      {chatTask && (
+      {chatTask && chatTask.mode === 'loop' && (
+        <LoopChatView task={chatTask} onBack={() => setChatTask(null)} />
+      )}
+      {chatTask && chatTask.mode !== 'loop' && (
         <ChatView task={chatTask} onBack={() => setChatTask(null)} />
       )}
     </div>

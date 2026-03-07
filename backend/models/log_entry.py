@@ -20,4 +20,5 @@ class LogEntry(Base):
     tool_output: Mapped[str | None] = mapped_column(Text, nullable=True)
     raw_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     is_error: Mapped[bool] = mapped_column(Boolean, default=False)
+    loop_iteration: Mapped[int | None] = mapped_column(Integer, nullable=True)  # loop tasks: which iteration produced this entry
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

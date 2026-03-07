@@ -11,7 +11,7 @@ class Task(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
-    description: Mapped[str] = mapped_column(Text, nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)  # nullable for loop tasks
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="pending", index=True
     )
@@ -24,7 +24,9 @@ class Task(Base):
     instance_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     max_retries: Mapped[int] = mapped_column(Integer, default=2)
-    mode: Mapped[str] = mapped_column(String(20), default="auto")  # "auto" or "plan"
+    mode: Mapped[str] = mapped_column(String(20), default="auto")  # "auto", "plan", or "loop"
+    todo_file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)  # loop only: path relative to target_repo
+    loop_progress: Mapped[str | None] = mapped_column(String(200), nullable=True)  # loop only: e.g. "3/5", written by Claude
     plan_content: Mapped[str | None] = mapped_column(Text, nullable=True)  # Claude's proposed plan
     plan_approved: Mapped[bool | None] = mapped_column(default=None)  # None=pending, True=approved, False=rejected
     session_id: Mapped[str | None] = mapped_column(String(200), nullable=True)

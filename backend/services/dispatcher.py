@@ -185,6 +185,11 @@ class GlobalDispatcher:
                 await self._run_plan_phase(instance_id, task, cwd)
                 return
 
+            # === Step 3b: Loop mode ===
+            if task.mode == "loop":
+                await self._run_loop_lifecycle(instance_id, task, cwd)
+                return
+
             # === Step 4: Launch Claude Code ===
             full_prompt = f"""请阅读项目根目录的 CLAUDE.md 了解项目规范和任务完成后的 git 流程。
 
@@ -269,6 +274,158 @@ class GlobalDispatcher:
             })
         finally:
             self._running_tasks.pop(instance_id, None)
+
+    async def _run_loop_lifecycle(self, instance_id: int, task: Task, cwd: str):
+        """Loop: repeatedly invoke Claude Code until it signals done or abort.
+
+        Each iteration starts a fresh Claude Code subprocess. Claude reads the todo
+        file itself, executes the next item, marks it done, then writes a signal file
+        telling us whether to continue, stop (done), or give up (abort).
+        The backend never parses the todo file — Claude owns that logic entirely.
+        """
+        import json
+        from pathlib import Path
+
+        signal_path = Path(cwd) / ".claude-manager" / f"loop_signal_{task.id}.json"
+        signal_path.parent.mkdir(parents=True, exist_ok=True)
+
+        iteration = 0
+
+        while True:
+            # Check if task was cancelled externally between iterations
+            async with self.db_factory() as db:
+                t = await db.get(Task, task.id)
+                if t and t.status == "cancelled":
+                    logger.info(f"Loop task {task.id} cancelled, stopping")
+                    return
+
+            # Clear signal file so we can detect if Claude fails to write one
+            signal_path.unlink(missing_ok=True)
+
+            prompt = self._build_loop_prompt(task, iteration, str(signal_path))
+
+            await self.instance_manager.launch(
+                instance_id=instance_id,
+                prompt=prompt,
+                task_id=task.id,
+                cwd=cwd,
+                model=None,
+                loop_iteration=iteration,
+            )
+
+            process = self.instance_manager.processes.get(instance_id)
+            if process:
+                try:
+                    await asyncio.wait_for(process.wait(), timeout=settings.task_timeout_seconds)
+                except asyncio.TimeoutError:
+                    logger.warning(f"Loop task {task.id} iteration {iteration} timed out, killing")
+                    process.kill()
+                    await process.wait()
+
+            signal = self._read_loop_signal(signal_path)
+
+            # Update loop_progress from signal (Claude's self-reported progress string)
+            if signal.get("progress"):
+                async with self.db_factory() as db:
+                    await db.execute(
+                        update(Task)
+                        .where(Task.id == task.id)
+                        .values(loop_progress=signal["progress"])
+                    )
+                    await db.commit()
+
+            # Broadcast iteration result so frontend can update the panel header
+            await self.broadcaster.broadcast(f"task:{task.id}", {
+                "event": "loop_iteration_end",
+                "iteration": iteration,
+                "action": signal.get("action", "abort"),
+                "reason": signal.get("reason", ""),
+                "progress": signal.get("progress"),
+            })
+
+            action = signal.get("action")
+
+            if action == "continue":
+                iteration += 1
+                continue
+
+            elif action == "done":
+                async with self.db_factory() as db:
+                    queue = TaskQueue(db)
+                    await queue.mark_completed(task.id)
+                await self.broadcaster.broadcast("tasks", {
+                    "event": "status_change",
+                    "task_id": task.id,
+                    "new_status": "completed",
+                    "instance_id": instance_id,
+                })
+                logger.info(f"Loop task {task.id} completed after {iteration + 1} iteration(s)")
+                break
+
+            else:
+                # "abort" or missing/malformed signal
+                reason = signal.get("reason") or "Claude did not write a valid loop signal"
+                async with self.db_factory() as db:
+                    queue = TaskQueue(db)
+                    await queue.mark_failed(task.id, reason)
+                await self.broadcaster.broadcast("tasks", {
+                    "event": "status_change",
+                    "task_id": task.id,
+                    "new_status": "failed",
+                    "instance_id": instance_id,
+                })
+                logger.warning(f"Loop task {task.id} aborted at iteration {iteration}: {reason}")
+                break
+
+        signal_path.unlink(missing_ok=True)
+
+    def _build_loop_prompt(self, task: Task, iteration: int, signal_path: str) -> str:
+        """Build the per-iteration prompt for a loop task.
+
+        Only describes todo-related responsibilities. Git/commit/worktree lifecycle
+        is already covered by CLAUDE.md — no need to repeat it here.
+        """
+        parts = []
+
+        if task.description:
+            parts.append(f"背景说明：{task.description}\n")
+
+        parts.append(f"""\
+请遵循 CLAUDE.md 中的所有要求和项目约定。
+
+这是一个持续循环任务的第 {iteration + 1} 轮。
+
+你的职责：
+1. 打开 {task.todo_file_path}，理解其结构，找到下一个待完成的任务项
+2. 根据 CLAUDE.md 的要求执行该任务项
+3. 在 todo 文件中将该项标记为已完成
+
+完成后，将以下 JSON 写入 {signal_path}：
+
+还有待完成项，请继续下一轮：
+{{"action": "continue", "reason": "...", "progress": "已完成数/总数"}}
+
+全部完成：
+{{"action": "done", "reason": "所有 todo 项已完成"}}
+
+无法继续（遇到阻塞或明确问题）：
+{{"action": "abort", "reason": "具体原因"}}
+""")
+        return "\n".join(parts)
+
+    def _read_loop_signal(self, signal_path) -> dict:
+        """Read and parse the signal file Claude writes at the end of each iteration.
+
+        Returns abort with a reason if the file is missing or malformed, so the
+        while loop always terminates cleanly instead of spinning indefinitely.
+        """
+        import json
+        from pathlib import Path
+        try:
+            return json.loads(Path(signal_path).read_text(encoding="utf-8"))
+        except Exception as e:
+            logger.warning(f"Failed to read loop signal from {signal_path}: {e}")
+            return {"action": "abort", "reason": "Signal file missing or invalid JSON"}
 
     async def _run_plan_phase(self, instance_id: int, task: Task, cwd: str):
         """Run plan phase for plan-mode tasks."""
