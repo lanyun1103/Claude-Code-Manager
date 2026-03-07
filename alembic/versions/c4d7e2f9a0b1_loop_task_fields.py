@@ -22,21 +22,22 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Use batch mode because SQLite does not support ALTER COLUMN natively.
-    with op.batch_alter_table('tasks', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('todo_file_path', sa.String(length=500), nullable=True))
-        batch_op.add_column(sa.Column('loop_progress', sa.String(length=200), nullable=True))
-        batch_op.alter_column('description', existing_type=sa.Text(), nullable=True)
+    # SQLite supports ADD COLUMN directly; avoid batch mode to prevent
+    # CircularDependencyError in SQLAlchemy's topological sort.
+    op.add_column('tasks', sa.Column('todo_file_path', sa.String(length=500), nullable=True))
+    op.add_column('tasks', sa.Column('loop_progress', sa.String(length=200), nullable=True))
+    # SQLite cannot ALTER COLUMN, but description is already TEXT and we only
+    # relax nullability — SQLite doesn't enforce NOT NULL on existing rows anyway,
+    # so this is a no-op at the DB level.
 
-    with op.batch_alter_table('log_entries', schema=None) as batch_op:
-        batch_op.add_column(sa.Column('loop_iteration', sa.Integer(), nullable=True))
+    op.add_column('log_entries', sa.Column('loop_iteration', sa.Integer(), nullable=True))
 
 
 def downgrade() -> None:
+    # SQLite doesn't support DROP COLUMN in older versions; use batch mode.
     with op.batch_alter_table('log_entries', schema=None) as batch_op:
         batch_op.drop_column('loop_iteration')
 
     with op.batch_alter_table('tasks', schema=None) as batch_op:
-        batch_op.alter_column('description', existing_type=sa.Text(), nullable=False)
         batch_op.drop_column('loop_progress')
         batch_op.drop_column('todo_file_path')

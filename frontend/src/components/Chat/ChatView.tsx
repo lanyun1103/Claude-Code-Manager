@@ -79,6 +79,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
       tool_input: (msg.data.tool_input as string) || null,
       tool_output: (msg.data.tool_output as string) || null,
       is_error: (msg.data.is_error as boolean) || false,
+      loop_iteration: (msg.data.loop_iteration as number) || null,
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, entry]);
@@ -121,6 +122,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
       tool_input: null,
       tool_output: null,
       is_error: false,
+      loop_iteration: null,
       timestamp: new Date().toISOString(),
     };
     setMessages((prev) => [...prev, userMsg]);

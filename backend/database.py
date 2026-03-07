@@ -1,10 +1,14 @@
 import asyncio
+from pathlib import Path
 
 from sqlalchemy import inspect
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from backend.config import settings
+
+# Project root (where alembic.ini lives)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 engine = create_async_engine(settings.database_url, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
@@ -35,15 +39,23 @@ async def init_db():
 
         has_tables, has_alembic = await conn.run_sync(_check)
 
-    cfg = Config("alembic.ini")
+    cfg = Config(str(_PROJECT_ROOT / "alembic.ini"))
+    cfg.set_main_option("script_location", str(_PROJECT_ROOT / "alembic"))
 
     if has_tables and not has_alembic:
-        # Legacy database: all schema changes were applied via manual ALTER TABLE.
-        # Stamp as head so Alembic treats it as fully up-to-date.
-        await asyncio.get_event_loop().run_in_executor(None, command.stamp, cfg, "head")
+        # Legacy database (created before Alembic was introduced).
+        # Stamp the initial schema revision, then upgrade to apply any new migrations.
+        await asyncio.get_event_loop().run_in_executor(
+            None, command.stamp, cfg, "6b3f8a1c2d9e"
+        )
+        await asyncio.get_event_loop().run_in_executor(
+            None, command.upgrade, cfg, "head"
+        )
     else:
         # Fresh install or already Alembic-tracked: apply any pending migrations.
-        await asyncio.get_event_loop().run_in_executor(None, command.upgrade, cfg, "head")
+        await asyncio.get_event_loop().run_in_executor(
+            None, command.upgrade, cfg, "head"
+        )
 
 
 async def get_db():
