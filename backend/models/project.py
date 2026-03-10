@@ -17,4 +17,5 @@ class Project(Base):
     default_branch: Mapped[str] = mapped_column(String(100), default="main")
     status: Mapped[str] = mapped_column(String(20), default="pending")  # pending, cloning, ready, error
     error_message: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    show_in_selector: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

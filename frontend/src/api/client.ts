@@ -47,6 +47,7 @@ export interface Project {
   default_branch: string;
   status: string;
   error_message: string | null;
+  show_in_selector: boolean;
   created_at: string;
 }
 
@@ -121,8 +122,12 @@ export const api = {
   listProjects: () => request<Project[]>('/api/projects'),
   createProject: (data: { name: string; git_url?: string; default_branch?: string }) =>
     request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
+  updateProject: (id: number, data: Partial<Pick<Project, 'name' | 'show_in_selector'>>) =>
+    request<Project>(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteProject: (id: number) =>
     request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
+  recloneProject: (id: number) =>
+    request<{ ok: boolean }>(`/api/projects/${id}/reclone`, { method: 'POST' }),
 
   // Tasks
   listTasks: (status?: string) =>

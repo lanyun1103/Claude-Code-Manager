@@ -104,7 +104,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
           onChange={(e) => handleProjectChange(e.target.value)}
         >
           <option value="">Select project...</option>
-          {projects.map((p) => (
+          {projects.filter((p) => p.show_in_selector).map((p) => (
             <option key={p.id} value={p.id}>
               {p.name} {p.status !== 'ready' ? `(${p.status})` : ''}
             </option>

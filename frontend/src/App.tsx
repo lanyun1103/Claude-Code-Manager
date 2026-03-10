@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { TasksPage } from './pages/TasksPage';
 import { LoginPage } from './pages/LoginPage';
 import { ServerConfigPage } from './pages/ServerConfigPage';
+import { ProjectsPage } from './pages/ProjectsPage';
 import { getToken } from './api/client';
 import { isCapacitor, getServerUrl, getApiBase } from './config/server';
 
@@ -102,6 +103,7 @@ function App() {
         <main className="flex-1 max-w-6xl mx-auto w-full p-4">
           {page === 'dashboard' && <Dashboard />}
           {page === 'tasks' && <TasksPage />}
+          {page === 'projects' && <ProjectsPage />}
           {page === 'server' && (
             <ServerConfigPage onConfigured={() => window.location.reload()} />
           )}

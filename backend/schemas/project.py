@@ -14,6 +14,7 @@ class ProjectUpdate(BaseModel):
     git_url: str | None = None
     has_remote: bool | None = None
     default_branch: str | None = None
+    show_in_selector: bool | None = None
 
 
 class ProjectResponse(BaseModel):
@@ -25,6 +26,7 @@ class ProjectResponse(BaseModel):
     default_branch: str
     status: str
     error_message: str | None
+    show_in_selector: bool
     created_at: datetime
 
     model_config = {"from_attributes": True}

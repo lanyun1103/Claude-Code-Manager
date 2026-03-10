@@ -14,6 +14,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
   const pages = [
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'tasks', label: 'Tasks' },
+    { key: 'projects', label: 'Projects' },
     ...(isCapacitor() ? [{ key: 'server', label: 'Server' }] : []),
   ];
 
