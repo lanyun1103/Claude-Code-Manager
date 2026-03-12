@@ -83,6 +83,13 @@ async def update_project(
         setattr(project, key, value)
     await db.commit()
     await db.refresh(project)
+
+    # Apply git config to local repo immediately if any git fields changed
+    git_fields = {"git_author_name", "git_author_email", "git_credential_type",
+                  "git_ssh_key_path", "git_https_username", "git_https_token"}
+    if git_fields & updates.keys() and project.local_path and os.path.isdir(project.local_path):
+        await _apply_git_config(project.local_path, _extract_git_config(project))
+
     return project
 
 
