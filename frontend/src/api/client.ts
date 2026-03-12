@@ -38,6 +38,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+export interface GlobalSettings {
+  git_author_name: string | null;
+  git_author_email: string | null;
+  git_credential_type: string | null;  // "ssh" | "https" | null
+  git_ssh_key_path: string | null;
+  git_https_username: string | null;
+  git_https_token: string | null;
+}
+
 export interface Project {
   id: number;
   name: string;
@@ -144,6 +153,11 @@ export const api = {
     request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
   recloneProject: (id: number) =>
     request<{ ok: boolean }>(`/api/projects/${id}/reclone`, { method: 'POST' }),
+
+  // Global Settings
+  getGitSettings: () => request<GlobalSettings>('/api/settings/git'),
+  updateGitSettings: (data: Partial<GlobalSettings>) =>
+    request<GlobalSettings>('/api/settings/git', { method: 'PUT', body: JSON.stringify(data) }),
 
   // Tasks
   listTasks: (status?: string) =>

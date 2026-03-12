@@ -8,6 +8,8 @@ from backend.config import settings
 from backend.models.instance import Instance
 from backend.models.task import Task
 from backend.models.project import Project
+from backend.models.global_settings import GlobalSettings
+from backend.services.git_config import merge_git_config, settings_to_dict
 from backend.services.instance_manager import InstanceManager
 from backend.services.task_queue import TaskQueue
 from backend.services.ws_broadcaster import WebSocketBroadcaster
@@ -15,22 +17,22 @@ from backend.services.ws_broadcaster import WebSocketBroadcaster
 logger = logging.getLogger(__name__)
 
 
-def _build_git_env(project) -> dict:
-    """Build git-related environment variables from a Project's git config fields.
+def _build_git_env(merged_config: dict) -> dict:
+    """Build git-related environment variables from a merged git config dict.
 
     GIT_AUTHOR_* / GIT_COMMITTER_* override user.name/email for every git commit
     executed inside the Claude Code subprocess, regardless of any ~/.gitconfig.
     GIT_SSH_COMMAND overrides the SSH key used for push/pull.
     """
     env: dict = {}
-    if project.git_author_name:
-        env["GIT_AUTHOR_NAME"] = project.git_author_name
-        env["GIT_COMMITTER_NAME"] = project.git_author_name
-    if project.git_author_email:
-        env["GIT_AUTHOR_EMAIL"] = project.git_author_email
-        env["GIT_COMMITTER_EMAIL"] = project.git_author_email
-    if project.git_credential_type == "ssh" and project.git_ssh_key_path:
-        env["GIT_SSH_COMMAND"] = f"ssh -i {project.git_ssh_key_path} -o StrictHostKeyChecking=no"
+    if merged_config.get("git_author_name"):
+        env["GIT_AUTHOR_NAME"] = merged_config["git_author_name"]
+        env["GIT_COMMITTER_NAME"] = merged_config["git_author_name"]
+    if merged_config.get("git_author_email"):
+        env["GIT_AUTHOR_EMAIL"] = merged_config["git_author_email"]
+        env["GIT_COMMITTER_EMAIL"] = merged_config["git_author_email"]
+    if merged_config.get("git_credential_type") == "ssh" and merged_config.get("git_ssh_key_path"):
+        env["GIT_SSH_COMMAND"] = f"ssh -i {merged_config['git_ssh_key_path']} -o StrictHostKeyChecking=no"
     return env
 
 
@@ -146,6 +148,7 @@ class GlobalDispatcher:
                     if task.project_id:
                         async with self.db_factory() as db:
                             project = await db.get(Project, task.project_id)
+                            global_cfg = await db.get(GlobalSettings, 1)
                             if project:
                                 if project.local_path and not task.target_repo:
                                     await db.execute(
@@ -155,7 +158,8 @@ class GlobalDispatcher:
                                     )
                                     await db.commit()
                                     task.target_repo = project.local_path
-                                git_env = _build_git_env(project)
+                                merged = merge_git_config(settings_to_dict(project), settings_to_dict(global_cfg))
+                                git_env = _build_git_env(merged)
 
                     logger.info(f"Dispatching task {task.id} ({task.title}) to instance {instance.id} ({instance.name})")
                     self._running_tasks[instance.id] = asyncio.create_task(

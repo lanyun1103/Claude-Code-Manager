@@ -17,6 +17,7 @@ from backend.api.voice import router as voice_router
 from backend.api.auth import router as auth_router
 from backend.api.chat import router as chat_router
 from backend.api.projects import router as projects_router
+from backend.api.settings import router as settings_router
 from backend.middleware.auth import TokenAuthMiddleware
 from backend.services.ws_broadcaster import WebSocketBroadcaster
 from backend.services.instance_manager import InstanceManager
@@ -66,6 +67,7 @@ app.include_router(voice_router)
 app.include_router(auth_router)
 app.include_router(chat_router)
 app.include_router(projects_router)
+app.include_router(settings_router)
 app.include_router(dispatcher_router)
 
 # Serve frontend static files in production

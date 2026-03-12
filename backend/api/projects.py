@@ -8,7 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.config import settings
 from backend.database import get_db, async_session
 from backend.models.project import Project
+from backend.models.global_settings import GlobalSettings
 from backend.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from backend.services.git_config import merge_git_config, settings_to_dict
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -48,7 +50,8 @@ async def create_project(body: ProjectCreate, db: AsyncSession = Depends(get_db)
     await db.commit()
     await db.refresh(project)
 
-    git_config = _extract_git_config(project)
+    global_cfg = await db.get(GlobalSettings, 1)
+    git_config = merge_git_config(_extract_git_config(project), settings_to_dict(global_cfg))
     if has_remote:
         asyncio.create_task(_clone_repo(project.id, body.git_url, local_path, body.name, body.default_branch, git_config))
     else:
@@ -103,7 +106,9 @@ async def reclone_project(project_id: int, db: AsyncSession = Depends(get_db)):
     project.status = "pending"
     project.error_message = None
     await db.commit()
-    asyncio.create_task(_clone_repo(project_id, project.git_url, project.local_path, project.name, project.default_branch, _extract_git_config(project)))
+    global_cfg = await db.get(GlobalSettings, 1)
+    git_config = merge_git_config(_extract_git_config(project), settings_to_dict(global_cfg))
+    asyncio.create_task(_clone_repo(project_id, project.git_url, project.local_path, project.name, project.default_branch, git_config))
     return {"ok": True}
 
 

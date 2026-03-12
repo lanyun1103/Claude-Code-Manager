@@ -1,7 +1,172 @@
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../api/client';
-import type { Project } from '../api/client';
+import type { Project, GlobalSettings } from '../api/client';
 import { Trash2, RotateCcw, FolderGit2, Globe, HardDrive, Plus, Settings, X, ChevronDown, ChevronUp } from 'lucide-react';
+
+// ── Shared: identity warning ──────────────────────────────────────────────────
+
+function IdentityWarning({ name, email }: { name: string; email: string }) {
+  const hasName = name.trim() !== '';
+  const hasEmail = email.trim() !== '';
+  if ((hasName && hasEmail) || (!hasName && !hasEmail)) return null;
+  return (
+    <p className="col-span-2 text-xs text-amber-400">
+      姓名和邮箱必须同时填写才会生效，否则将使用全局配置
+    </p>
+  );
+}
+
+// ── Global Git Config Modal ───────────────────────────────────────────────────
+
+function GlobalGitConfigModal({ onClose }: { onClose: () => void }) {
+  const [form, setForm] = useState<Omit<GlobalSettings, never>>({
+    git_author_name: null,
+    git_author_email: null,
+    git_credential_type: null,
+    git_ssh_key_path: null,
+    git_https_username: null,
+    git_https_token: null,
+  });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const name = form.git_author_name ?? '';
+  const email = form.git_author_email ?? '';
+  const credType = form.git_credential_type ?? '';
+
+  useEffect(() => {
+    api.getGitSettings().then((data) => {
+      setForm(data);
+      setLoading(false);
+    }).catch((e) => {
+      setError(String(e));
+      setLoading(false);
+    });
+  }, []);
+
+  const set = (key: keyof GlobalSettings, value: string) =>
+    setForm((f) => ({ ...f, [key]: value || null }));
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    setError(null);
+    try {
+      await api.updateGitSettings({
+        git_author_name: name.trim() || null,
+        git_author_email: email.trim() || null,
+        git_credential_type: credType || null,
+        git_ssh_key_path: form.git_ssh_key_path?.trim() || null,
+        git_https_username: form.git_https_username?.trim() || null,
+        git_https_token: form.git_https_token?.trim() || null,
+      });
+      onClose();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-700">
+          <h3 className="text-foreground font-semibold">Global Git Config</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-200"><X size={18} /></button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+          {loading ? (
+            <p className="text-gray-400 text-sm">Loading...</p>
+          ) : (
+            <>
+              <p className="text-xs text-gray-500">项目未配置时使用此全局默认值。</p>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Author name</label>
+                  <input
+                    className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={name} onChange={(e) => set('git_author_name', e.target.value)}
+                    placeholder="Zhang San"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Author email</label>
+                  <input
+                    className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={email} onChange={(e) => set('git_author_email', e.target.value)}
+                    placeholder="zhang@example.com"
+                  />
+                </div>
+                <IdentityWarning name={name} email={email} />
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-400 mb-1">Credential type</label>
+                <select
+                  className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                  value={credType} onChange={(e) => set('git_credential_type', e.target.value)}
+                >
+                  <option value="">None</option>
+                  <option value="ssh">SSH key</option>
+                  <option value="https">HTTPS token</option>
+                </select>
+              </div>
+
+              {credType === 'ssh' && (
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">SSH private key path</label>
+                  <input
+                    className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                    value={form.git_ssh_key_path ?? ''} onChange={(e) => set('git_ssh_key_path', e.target.value)}
+                    placeholder="/home/alice/.ssh/id_ed25519"
+                  />
+                </div>
+              )}
+
+              {credType === 'https' && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Username</label>
+                    <input
+                      className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                      value={form.git_https_username ?? ''} onChange={(e) => set('git_https_username', e.target.value)}
+                      placeholder="github-username"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Personal access token</label>
+                    <input
+                      type="password"
+                      className="w-full bg-gray-700 text-foreground text-sm rounded px-3 py-2 outline-none focus:ring-1 focus:ring-indigo-500"
+                      value={form.git_https_token ?? ''} onChange={(e) => set('git_https_token', e.target.value)}
+                      placeholder="ghp_..."
+                    />
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-300 hover:text-white">Cancel</button>
+            <button
+              type="submit"
+              disabled={submitting || loading}
+              className="px-4 py-2 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {submitting ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
 
 // ── Create Project Modal ──────────────────────────────────────────────────────
 
@@ -34,6 +199,9 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
   const [showGit, setShowGit] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const identityName = form.git_author_name;
+  const identityEmail = form.git_author_email;
 
   const set = (key: keyof CreateForm, value: string) =>
     setForm((f) => ({ ...f, [key]: value }));
@@ -135,6 +303,7 @@ function CreateModal({ onClose, onCreated }: { onClose: () => void; onCreated: (
                       placeholder="zhang@example.com"
                     />
                   </div>
+                  <IdentityWarning name={identityName} email={identityEmail} />
                 </div>
 
                 <div>
@@ -269,6 +438,7 @@ function GitConfigModal({ project, onClose, onSaved }: { project: Project; onClo
                 placeholder="zhang@example.com"
               />
             </div>
+            <IdentityWarning name={form.git_author_name} email={form.git_author_email} />
           </div>
 
           <div>
@@ -340,6 +510,7 @@ export function ProjectsPage() {
   const [loading, setLoading] = useState<Record<number, boolean>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [editingGit, setEditingGit] = useState<Project | null>(null);
+  const [showGlobalGit, setShowGlobalGit] = useState(false);
 
   const refresh = useCallback(async () => {
     try {
@@ -390,12 +561,21 @@ export function ProjectsPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-foreground font-semibold text-lg">Projects</h2>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500"
-        >
-          <Plus size={14} /> New project
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowGlobalGit(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-300 border border-gray-600 rounded hover:bg-gray-700"
+            title="Global Git Config"
+          >
+            <Settings size={14} /> Global Git Config
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-500"
+          >
+            <Plus size={14} /> New project
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -512,6 +692,7 @@ export function ProjectsPage() {
 
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={refresh} />}
       {editingGit && <GitConfigModal project={editingGit} onClose={() => setEditingGit(null)} onSaved={refresh} />}
+      {showGlobalGit && <GlobalGitConfigModal onClose={() => setShowGlobalGit(false)} />}
     </div>
   );
 }
