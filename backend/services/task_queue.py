@@ -21,14 +21,25 @@ class TaskQueue:
         return await self.db.get(Task, task_id)
 
     async def list_tasks(
-        self, status: str | None = None, limit: int = 50, offset: int = 0
+        self, status: str | None = None, include_archived: bool = False, limit: int = 50, offset: int = 0
     ) -> list[Task]:
         stmt = select(Task).order_by(Task.created_at.desc())
+        if not include_archived:
+            stmt = stmt.where(Task.archived == False)
         if status:
             stmt = stmt.where(Task.status == status)
         stmt = stmt.limit(limit).offset(offset)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def archive(self, task_id: int) -> Task | None:
+        task = await self.get(task_id)
+        if not task:
+            return None
+        task.archived = not task.archived
+        await self.db.commit()
+        await self.db.refresh(task)
+        return task
 
     async def update_task(self, task_id: int, **kwargs) -> Task | None:
         task = await self.get(task_id)

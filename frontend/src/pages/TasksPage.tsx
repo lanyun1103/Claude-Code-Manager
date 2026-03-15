@@ -12,6 +12,7 @@ export function TasksPage() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filter, setFilter] = useState<string>('');
+  const [showArchived, setShowArchived] = useState(false);
   const [chatTask, setChatTask] = useState<Task | null>(null);
   const chatTaskRef = useRef<Task | null>(null);
   chatTaskRef.current = chatTask;
@@ -19,8 +20,8 @@ export function TasksPage() {
   const refresh = useCallback(async () => {
     try {
       const [filtered, all, projs] = await Promise.all([
-        api.listTasks(filter || undefined),
-        api.listTasks(),
+        api.listTasks(filter || undefined, showArchived),
+        api.listTasks(undefined, showArchived),
         api.listProjects(),
       ]);
       setTasks(filtered);
@@ -35,7 +36,7 @@ export function TasksPage() {
     } catch (e) {
       console.error('Failed to load tasks:', e);
     }
-  }, [filter]);
+  }, [filter, showArchived]);
 
   useEffect(() => {
     refresh();
@@ -51,7 +52,7 @@ export function TasksPage() {
 
       <PlanPanel tasks={allTasks} onRefresh={refresh} />
 
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap items-center">
         {filters.map((f) => (
           <button
             key={f}
@@ -65,6 +66,16 @@ export function TasksPage() {
             {f || 'All'}
           </button>
         ))}
+        <button
+          onClick={() => setShowArchived(!showArchived)}
+          className={`px-3 py-1 rounded text-xs font-medium transition-colors ml-2 ${
+            showArchived
+              ? 'bg-amber-600 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          Archived
+        </button>
       </div>
 
       <TaskList tasks={tasks} projects={projects} onRefresh={refresh} onOpenChat={(t) => setChatTask(t)} />

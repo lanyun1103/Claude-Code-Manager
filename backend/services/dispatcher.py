@@ -23,6 +23,8 @@ def _build_git_env(merged_config: dict) -> dict:
     GIT_AUTHOR_* / GIT_COMMITTER_* override user.name/email for every git commit
     executed inside the Claude Code subprocess, regardless of any ~/.gitconfig.
     GIT_SSH_COMMAND overrides the SSH key used for push/pull.
+
+    Priority: project-level > global settings > instance-level (settings.git_ssh_key_path).
     """
     env: dict = {}
     if merged_config.get("git_author_name"):
@@ -33,6 +35,9 @@ def _build_git_env(merged_config: dict) -> dict:
         env["GIT_COMMITTER_EMAIL"] = merged_config["git_author_email"]
     if merged_config.get("git_credential_type") == "ssh" and merged_config.get("git_ssh_key_path"):
         env["GIT_SSH_COMMAND"] = f"ssh -i {merged_config['git_ssh_key_path']} -o StrictHostKeyChecking=no"
+    # Fallback to instance-level SSH key (set via GIT_SSH_KEY_PATH env var)
+    if "GIT_SSH_COMMAND" not in env and settings.git_ssh_key_path:
+        env["GIT_SSH_COMMAND"] = f"ssh -i {settings.git_ssh_key_path} -o StrictHostKeyChecking=no"
     return env
 
 
@@ -144,7 +149,7 @@ class GlobalDispatcher:
                         break  # No more tasks
 
                     # Resolve project -> target_repo + git config
-                    git_env: dict = {}
+                    merged: dict = {}
                     if task.project_id:
                         async with self.db_factory() as db:
                             project = await db.get(Project, task.project_id)
@@ -159,7 +164,7 @@ class GlobalDispatcher:
                                     await db.commit()
                                     task.target_repo = project.local_path
                                 merged = merge_git_config(settings_to_dict(project), settings_to_dict(global_cfg))
-                                git_env = _build_git_env(merged)
+                    git_env = _build_git_env(merged)
 
                     logger.info(f"Dispatching task {task.id} ({task.title}) to instance {instance.id} ({instance.name})")
                     self._running_tasks[instance.id] = asyncio.create_task(

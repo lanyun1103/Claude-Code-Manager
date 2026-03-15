@@ -2,6 +2,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.database import get_db
+from backend.models.task import Task
+from backend.models.instance import Instance
 from backend.schemas.task import TaskCreate, TaskUpdate, TaskResponse
 from backend.services.task_queue import TaskQueue
 
@@ -15,11 +17,12 @@ def _get_queue(db: AsyncSession = Depends(get_db)) -> TaskQueue:
 @router.get("", response_model=list[TaskResponse])
 async def list_tasks(
     status: str | None = None,
+    include_archived: bool = False,
     limit: int = 50,
     offset: int = 0,
     queue: TaskQueue = Depends(_get_queue),
 ):
-    return await queue.list_tasks(status=status, limit=limit, offset=offset)
+    return await queue.list_tasks(status=status, include_archived=include_archived, limit=limit, offset=offset)
 
 
 @router.post("", response_model=TaskResponse, status_code=201)
@@ -57,6 +60,31 @@ async def delete_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
     return {"ok": True}
 
 
+@router.post("/{task_id}/stop-session")
+async def stop_task_session(task_id: int, db: AsyncSession = Depends(get_db)):
+    """Stop the running Claude Code session for a task."""
+    from backend.main import instance_manager
+    task = await db.get(Task, task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    # Find the instance running this task by checking instance_manager processes
+    stopped = False
+    for inst_id, proc in list(instance_manager.processes.items()):
+        if proc.returncode is not None:
+            continue
+        inst = await db.get(Instance, inst_id)
+        if inst and inst.current_task_id == task_id:
+            await instance_manager.stop(inst_id)
+            stopped = True
+            break
+    # Fallback: try task.instance_id
+    if not stopped and task.instance_id:
+        stopped = await instance_manager.stop(task.instance_id)
+    if not stopped:
+        raise HTTPException(400, "No running session found for this task")
+    return {"ok": True}
+
+
 @router.post("/{task_id}/cancel", response_model=TaskResponse)
 async def cancel_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
     task = await queue.cancel(task_id)
@@ -68,6 +96,14 @@ async def cancel_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
 @router.post("/{task_id}/retry", response_model=TaskResponse)
 async def retry_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
     task = await queue.retry(task_id)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    return task
+
+
+@router.post("/{task_id}/archive", response_model=TaskResponse)
+async def archive_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
+    task = await queue.archive(task_id)
     if not task:
         raise HTTPException(404, "Task not found")
     return task

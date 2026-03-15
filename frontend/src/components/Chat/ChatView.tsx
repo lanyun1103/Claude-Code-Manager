@@ -4,7 +4,7 @@ import remarkGfm from 'remark-gfm';
 import { api } from '../../api/client';
 import type { ChatMessage, Task, UploadResult } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
-import { Send, ArrowLeft, Loader2, ChevronDown, ChevronRight, Copy, Check, Paperclip, X } from 'lucide-react';
+import { Send, ArrowLeft, Loader2, ChevronDown, ChevronRight, Copy, Check, Paperclip, X, StopCircle } from 'lucide-react';
 
 interface ChatViewProps {
   task: Task;
@@ -43,6 +43,7 @@ export function ChatView({ task, onBack }: ChatViewProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [stopping, setStopping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -184,6 +185,24 @@ export function ChatView({ task, onBack }: ChatViewProps) {
             {task.session_id ? 'Session active' : 'No session yet'}
           </p>
         </div>
+        {(sending || ['in_progress', 'executing'].includes(task.status)) && (
+          <button
+            onClick={async () => {
+              setStopping(true);
+              try {
+                await api.stopTaskSession(task.id);
+                setSending(false);
+              } catch { /* ignore */ }
+              finally { setStopping(false); }
+            }}
+            disabled={stopping}
+            className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-400 hover:text-red-300 border border-red-500/30 rounded hover:bg-red-500/10 disabled:opacity-50"
+            title="Stop session"
+          >
+            <StopCircle size={14} />
+            {stopping ? 'Stopping...' : 'Stop'}
+          </button>
+        )}
       </div>
 
       {/* Messages */}

@@ -85,6 +85,7 @@ export interface Task {
   loop_progress: string | null;
   plan_content: string | null;
   plan_approved: boolean | null;
+  archived: boolean;
   session_id: string | null;
   error_message: string | null;
   tags: string[] | null;
@@ -185,8 +186,12 @@ export const api = {
   },
 
   // Tasks
-  listTasks: (status?: string) =>
-    request<Task[]>(`/api/tasks${status ? `?status=${status}` : ''}`),
+  listTasks: (status?: string, includeArchived?: boolean) =>
+    request<Task[]>(`/api/tasks?${new URLSearchParams({ ...(status ? { status } : {}), ...(includeArchived ? { include_archived: 'true' } : {}) })}`),
+  archiveTask: (id: number) =>
+    request<Task>(`/api/tasks/${id}/archive`, { method: 'POST' }),
+  stopTaskSession: (id: number) =>
+    request<{ ok: boolean }>(`/api/tasks/${id}/stop-session`, { method: 'POST' }),
   createTask: (data: { title?: string; description?: string; project_id?: number; priority?: number; target_branch?: string; mode?: string; todo_file_path?: string; image_paths?: string[] }) =>
     request<Task>('/api/tasks', { method: 'POST', body: JSON.stringify(data) }),
   deleteTask: (id: number) =>

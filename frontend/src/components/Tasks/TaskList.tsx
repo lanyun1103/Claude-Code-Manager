@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { api } from '../../api/client';
 import type { Task, Project } from '../../api/client';
-import { Trash2, RotateCcw, XCircle, MessageCircle } from 'lucide-react';
+import { Trash2, RotateCcw, XCircle, MessageCircle, Archive, ArchiveRestore } from 'lucide-react';
 
 interface TaskListProps {
   tasks: Task[];
@@ -36,6 +36,10 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
   };
   const handleRetry = async (id: number) => {
     await api.retryTask(id);
+    onRefresh();
+  };
+  const handleArchive = async (id: number) => {
+    await api.archiveTask(id);
     onRefresh();
   };
   if (tasks.length === 0) {
@@ -93,6 +97,9 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
                 <RotateCcw size={16} />
               </button>
             )}
+            <button onClick={() => handleArchive(t.id)} className="p-1.5 text-gray-400 hover:text-amber-400" title={t.archived ? "Unarchive" : "Archive"}>
+              {t.archived ? <ArchiveRestore size={16} /> : <Archive size={16} />}
+            </button>
             {['pending', 'failed', 'cancelled'].includes(t.status) && (
               <button onClick={() => handleDelete(t.id)} className="p-1.5 text-gray-400 hover:text-red-400" title="Delete">
                 <Trash2 size={16} />

@@ -57,6 +57,7 @@ class TaskResponse(BaseModel):
     plan_content: str | None
     plan_approved: bool | None
     session_id: str | None
+    archived: bool
     error_message: str | None
     tags: list[str] | None
     created_at: datetime

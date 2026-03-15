@@ -589,61 +589,63 @@ export function ProjectsPage() {
       ) : (
         <div className="space-y-3">
           {projects.map((p) => (
-            <div key={p.id} className="bg-gray-800 rounded-lg p-4 flex items-start gap-4">
-              {/* Icon */}
-              <div className="mt-1 text-gray-400">
-                <FolderGit2 size={20} />
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-foreground font-medium">{p.name}</span>
-                  <span className={`inline-block w-2 h-2 rounded-full ${statusColor[p.status] || 'bg-gray-500'}`} title={p.status} />
-                  <span className="text-xs text-gray-500 capitalize">{p.status}</span>
-                  {p.has_remote ? (
-                    <span className="flex items-center gap-1 text-xs text-sky-400">
-                      <Globe size={12} /> Remote
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-gray-500">
-                      <HardDrive size={12} /> Local
-                    </span>
-                  )}
+            <div key={p.id} className="bg-gray-800 rounded-lg p-3 sm:p-4 space-y-2">
+              <div className="flex items-start gap-3">
+                {/* Icon */}
+                <div className="mt-1 text-gray-400">
+                  <FolderGit2 size={20} />
                 </div>
 
-                {p.git_url && (
-                  <p className="text-xs text-gray-500 truncate" title={p.git_url}>{p.git_url}</p>
-                )}
-                {p.local_path && (
-                  <p className="text-xs text-gray-500 truncate" title={p.local_path}>{p.local_path}</p>
-                )}
-                {p.error_message && (
-                  <p className="text-xs text-red-400 truncate" title={p.error_message}>{p.error_message}</p>
-                )}
+                {/* Info */}
+                <div className="flex-1 min-w-0 space-y-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-foreground font-medium">{p.name}</span>
+                    <span className={`inline-block w-2 h-2 rounded-full ${statusColor[p.status] || 'bg-gray-500'}`} title={p.status} />
+                    <span className="text-xs text-gray-500 capitalize">{p.status}</span>
+                    {p.has_remote ? (
+                      <span className="flex items-center gap-1 text-xs text-sky-400">
+                        <Globe size={12} /> Remote
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-gray-500">
+                        <HardDrive size={12} /> Local
+                      </span>
+                    )}
+                  </div>
 
-                <div className="flex items-center gap-4 text-xs text-gray-500">
-                  <span>Branch: {p.default_branch}</span>
-                  {p.git_author_name && <span>Author: {p.git_author_name}</span>}
-                  {p.git_credential_type && <span>Creds: {p.git_credential_type}</span>}
-                  <span>Created: {new Date(p.created_at).toLocaleDateString()}</span>
+                  {p.git_url && (
+                    <p className="text-xs text-gray-500 truncate" title={p.git_url}>{p.git_url}</p>
+                  )}
+                  {p.local_path && (
+                    <p className="text-xs text-gray-500 truncate" title={p.local_path}>{p.local_path}</p>
+                  )}
+                  {p.error_message && (
+                    <p className="text-xs text-red-400 truncate" title={p.error_message}>{p.error_message}</p>
+                  )}
+
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    <span>Branch: {p.default_branch}</span>
+                    {p.git_author_name && <span>Author: {p.git_author_name}</span>}
+                    {p.git_credential_type && <span>Creds: {p.git_credential_type}</span>}
+                    <span>Created: {new Date(p.created_at).toLocaleDateString()}</span>
+                  </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-3 shrink-0">
+              <div className="flex items-center gap-3 pl-8 sm:pl-0 sm:justify-end">
                 {/* Show in selector toggle */}
                 <label className="flex items-center gap-2 cursor-pointer select-none" title="Show in task project dropdown">
                   <span className="text-xs text-gray-400">Selector</span>
                   <button
                     onClick={() => toggleSelector(p)}
                     disabled={loading[p.id]}
-                    className={`relative w-10 h-5 rounded-full transition-colors ${
+                    className={`relative w-11 h-6 rounded-full transition-colors ${
                       p.show_in_selector ? 'bg-indigo-600' : 'bg-gray-600'
                     } ${loading[p.id] ? 'opacity-50' : ''}`}
                   >
                     <span
-                      className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
                         p.show_in_selector ? 'translate-x-5' : ''
                       }`}
                     />
@@ -670,7 +672,7 @@ export function ProjectsPage() {
                         setError(String(e));
                       }
                     }}
-                    className="p-2 text-gray-400 hover:text-sky-400 hover:bg-gray-700 rounded transition-colors"
+                    className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-sky-400 hover:bg-gray-700 rounded transition-colors"
                     title="Re-clone"
                   >
                     <RotateCcw size={16} />
@@ -679,7 +681,7 @@ export function ProjectsPage() {
 
                 <button
                   onClick={() => handleDelete(p.id)}
-                  className="p-2 text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
+                  className="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-red-400 hover:bg-gray-700 rounded transition-colors"
                   title="Delete project"
                 >
                   <Trash2 size={16} />
