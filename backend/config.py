@@ -17,6 +17,29 @@ class Settings(BaseSettings):
     task_timeout_seconds: int = 1800  # 30 minutes
     git_ssh_key_path: str = ""  # Instance-level SSH key, fallback when project has none
 
+    # --- Backup service (auto-backup) ---
+    backup_enabled: bool = False        # Set true to enable periodic DB backups
+    backup_type: str = "local"          # local | s3 | oss
+    backup_interval_seconds: int = 3600
+    backup_max_copies: int = 10
+    # local backend
+    backup_destination_path: str = ""
+    # AWS S3 backend
+    backup_s3_bucket: str = ""
+    backup_s3_region: str = ""
+    backup_s3_access_key: str = ""
+    backup_s3_secret_key: str = ""
+    # Alibaba Cloud OSS backend
+    backup_oss_endpoint: str = ""
+    backup_oss_bucket: str = ""
+    backup_oss_access_key: str = ""
+    backup_oss_secret_key: str = ""
+
+    # --- Token usage manager service ---
+    token_manager_enabled: bool = False  # Set true to start token-usage-manager alongside
+    token_manager_port: int = 8001       # Port for the token-usage-manager service
+    token_manager_path: str = ""         # Filesystem path to token-usage-manager repo root
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

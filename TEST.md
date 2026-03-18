@@ -204,6 +204,48 @@ cd frontend && npx tsc --noEmit
 | `test_merge_to_main_success` / `test_merge_to_main_conflict` | 合并成功/冲突 |
 | `test_remove_worktree` | 删除 worktree + DB 更新 |
 
+##### `test_service_backup.py` — 数据库备份服务
+
+| 测试 | 验证内容 |
+|------|---------|
+| `TestBuildDestination::test_local_ok` | local 目标 dict 字段正确 |
+| `TestBuildDestination::test_local_empty_path_returns_none` | local 路径为空时返回 None（禁用备份） |
+| `TestBuildDestination::test_s3_ok` | S3 目标 dict 包含 bucket/region/access_key/secret_key |
+| `TestBuildDestination::test_s3_missing_bucket_returns_none` | S3 缺少 bucket 时返回 None |
+| `TestBuildDestination::test_oss_ok` | OSS 目标 dict 包含 endpoint/bucket/access_key/secret_key |
+| `TestBuildDestination::test_oss_missing_endpoint_returns_none` | OSS 缺少 endpoint 时返回 None |
+| `TestBuildDestination::test_oss_missing_bucket_returns_none` | OSS 缺少 bucket 时返回 None |
+| `TestBuildDestination::test_unknown_type_returns_none` | 未知类型返回 None |
+| `TestResolveDbPath::test_strips_async_prefix` | 去掉 `sqlite+aiosqlite:///` 前缀 |
+| `TestResolveDbPath::test_strips_sync_prefix` | 去掉 `sqlite:///` 前缀 |
+| `TestResolveDbPath::test_absolute_path_unchanged` | 绝对路径正确解析 |
+| `TestStart::test_local_starts_scheduler` | 调用 add_task + start，interval/max_copies 正确 |
+| `TestStart::test_returns_false_when_destination_not_configured` | 目标未配置时返回 False，不实例化 AutoBackup |
+| `TestStart::test_s3_passes_correct_destination` | S3 目标 dict 传给 add_task |
+| `TestStart::test_oss_passes_correct_destination` | OSS 目标 dict 传给 add_task |
+| `TestStart::test_custom_interval_and_max_copies` | 自定义 interval/max_copies 生效 |
+| `TestStop::test_stop_calls_backup_stop` | stop() 调用底层 stop()，清空 _backup |
+| `TestStop::test_stop_without_start_is_safe` | 未 start 时 stop() 不报错 |
+| `TestStop::test_stop_idempotent` | 重复 stop() 只调用一次底层 stop() |
+
+##### `test_service_token_manager.py` — Token Manager 子进程管理
+
+| 测试 | 验证内容 |
+|------|---------|
+| `TestStart::test_returns_false_when_backend_dir_missing` | backend 目录不存在时返回 False |
+| `TestStart::test_launches_subprocess` | 成功启动子进程 |
+| `TestStart::test_command_contains_uvicorn_and_port` | 命令包含 uvicorn 和端口号 |
+| `TestStart::test_cwd_points_to_backend_subdir` | cwd 设为仓库根目录下的 backend/ |
+| `TestStart::test_env_contains_port_var` | env 中 PORT 变量设为配置的端口 |
+| `TestStart::test_is_running_true_after_start` | 进程启动后 is_running=True |
+| `TestStart::test_is_running_false_when_process_exited` | 进程已退出时 is_running=False |
+| `TestStop::test_terminates_process` | stop() 调用 terminate() + wait() |
+| `TestStop::test_kills_on_timeout` | wait() 超时后调用 kill() |
+| `TestStop::test_stop_without_start_is_safe` | 未 start 时 stop() 不报错 |
+| `TestStop::test_stop_idempotent` | 重复 stop() 只 terminate 一次 |
+| `TestIsRunning::test_false_before_start` | 启动前 is_running=False |
+| `TestIsRunning::test_false_after_stop` | stop() 后 is_running=False |
+
 ##### `test_service_ralph_loop.py` — Ralph Loop 生命周期
 
 | 测试 | 验证内容 |
@@ -381,4 +423,6 @@ git branch
 | `backend/services/ralph_loop.py` | `backend/tests/test_service_ralph_loop.py` |
 | `backend/services/ws_broadcaster.py` | `backend/tests/test_service_ws_broadcaster.py` |
 | `backend/services/whisper_client.py` | `backend/tests/test_service_whisper_client.py` |
+| `backend/services/backup_service.py` | `backend/tests/test_service_backup.py` |
+| `backend/services/token_manager_service.py` | `backend/tests/test_service_token_manager.py` |
 | `frontend/src/**` | TypeScript 类型检查 (`tsc --noEmit`) |

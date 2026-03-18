@@ -46,7 +46,44 @@ async def lifespan(app: FastAPI):
     await init_db()
     if settings.auto_start_dispatcher:
         await dispatcher.start()
+
+    # Start periodic database backup (optional — requires BACKUP_ENABLED=true in .env)
+    backup_svc = None
+    if settings.backup_enabled:
+        from backend.services.backup_service import BackupService
+        backup_svc = BackupService(
+            db_path=settings.database_url,
+            backup_type=settings.backup_type,
+            interval_seconds=settings.backup_interval_seconds,
+            max_copies=settings.backup_max_copies,
+            destination_path=settings.backup_destination_path,
+            s3_bucket=settings.backup_s3_bucket,
+            s3_region=settings.backup_s3_region,
+            s3_access_key=settings.backup_s3_access_key,
+            s3_secret_key=settings.backup_s3_secret_key,
+            oss_endpoint=settings.backup_oss_endpoint,
+            oss_bucket=settings.backup_oss_bucket,
+            oss_access_key=settings.backup_oss_access_key,
+            oss_secret_key=settings.backup_oss_secret_key,
+        )
+        backup_svc.start()
+
+    # Start token-usage-manager as a subprocess (optional — requires TOKEN_MANAGER_ENABLED=true)
+    token_mgr_svc = None
+    if settings.token_manager_enabled and settings.token_manager_path:
+        from backend.services.token_manager_service import TokenManagerService
+        token_mgr_svc = TokenManagerService(
+            path=settings.token_manager_path,
+            port=settings.token_manager_port,
+        )
+        token_mgr_svc.start()
+
     yield
+
+    if backup_svc:
+        backup_svc.stop()
+    if token_mgr_svc:
+        token_mgr_svc.stop()
     await dispatcher.stop()
 
 

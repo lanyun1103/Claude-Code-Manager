@@ -219,9 +219,12 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 
 ## 配置
 
+### 基础配置
+
 | 环境变量 | 默认值 | 说明 |
 |----------|--------|------|
 | `AUTH_TOKEN` | (必填) | API 认证 Token |
+| `PORT` | `8000` | 主服务监听端口 |
 | `OPENAI_API_KEY` | (可选) | 语音功能所需 |
 | `DATABASE_URL` | `sqlite+aiosqlite:///./claude_manager.db` | 数据库连接 |
 | `WORKSPACE_DIR` | `~/Projects` | 项目 clone 目标目录 |
@@ -230,6 +233,84 @@ JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home" \
 | `MERGE_PUSH_RETRIES` | `3` | rebase + push 最大重试次数 |
 | `AUTO_PUSH_TO_ORIGIN` | `true` | 完成后是否自动 push |
 | `TASK_TIMEOUT_SECONDS` | `1800` | 单个任务最长执行时间（秒），超时后 kill 进程 |
+
+### 数据库自动备份（可选）
+
+集成 [auto-backup](https://github.com/zjw49246/auto-backup)，支持定期备份 SQLite 数据库到本机、AWS S3 或阿里云 OSS。
+
+| 环境变量 | 默认值 | 说明 |
+|----------|--------|------|
+| `BACKUP_ENABLED` | `false` | 设为 `true` 启用备份 |
+| `BACKUP_TYPE` | `local` | 目标类型：`local` / `s3` / `oss` |
+| `BACKUP_INTERVAL_SECONDS` | `3600` | 备份间隔（秒） |
+| `BACKUP_MAX_COPIES` | `10` | 保留的最大备份份数 |
+| `BACKUP_DESTINATION_PATH` | `` | （local）备份目标目录 |
+| `BACKUP_S3_BUCKET` | `` | （s3）S3 桶名 |
+| `BACKUP_S3_REGION` | `` | （s3）AWS 区域 |
+| `BACKUP_S3_ACCESS_KEY` | `` | （s3）AWS Access Key ID |
+| `BACKUP_S3_SECRET_KEY` | `` | （s3）AWS Secret Access Key |
+| `BACKUP_OSS_ENDPOINT` | `` | （oss）OSS Endpoint，如 `oss-cn-hangzhou.aliyuncs.com` |
+| `BACKUP_OSS_BUCKET` | `` | （oss）OSS 桶名 |
+| `BACKUP_OSS_ACCESS_KEY` | `` | （oss）阿里云 Access Key ID |
+| `BACKUP_OSS_SECRET_KEY` | `` | （oss）阿里云 Access Key Secret |
+
+**示例（本地备份）：**
+```env
+BACKUP_ENABLED=true
+BACKUP_TYPE=local
+BACKUP_DESTINATION_PATH=/mnt/backup/claude-manager
+BACKUP_INTERVAL_SECONDS=3600
+BACKUP_MAX_COPIES=10
+```
+
+### Token Usage Manager（可选）
+
+集成 [token-usage-manager](https://github.com/zjw49246/token-usage-manager)，提供 Gemini API 调用的 Token 配额管理与访问控制。启动时作为子进程随本服务一起启动，通过独立端口（默认 8001）和二级域名访问。
+
+| 环境变量 | 默认值 | 说明 |
+|----------|--------|------|
+| `TOKEN_MANAGER_ENABLED` | `false` | 设为 `true` 启用 |
+| `TOKEN_MANAGER_PORT` | `8001` | token-usage-manager 监听端口 |
+| `TOKEN_MANAGER_PATH` | `` | token-usage-manager 仓库根目录的完整路径 |
+
+**设置步骤：**
+
+1. Clone token-usage-manager 仓库：
+   ```bash
+   git clone https://github.com/zjw49246/token-usage-manager.git ~/Projects/token-usage-manager
+   cd ~/Projects/token-usage-manager/backend && cp .env.example .env
+   # 编辑 .env，填写 GEMINI_API_KEY 和 ADMIN_TOKEN
+   uv sync
+   ```
+
+2. 在本项目 `.env` 中配置：
+   ```env
+   TOKEN_MANAGER_ENABLED=true
+   TOKEN_MANAGER_PORT=8001
+   TOKEN_MANAGER_PATH=/Users/yourname/Projects/token-usage-manager
+   ```
+
+3. 通过 Cloudflare Tunnel 配置二级域名（见下方「Cloudflare Tunnel 部署」）。
+
+#### Cloudflare Tunnel 多服务路由
+
+通过二级域名区分两个服务，需要在 `~/.cloudflared/config.yml` 中配置多条 ingress 规则：
+
+```yaml
+tunnel: <tunnel-id>
+credentials-file: /Users/yourname/.cloudflared/<tunnel-id>.json
+
+ingress:
+  # Token Usage Manager — 二级域名访问，PORT 与 TOKEN_MANAGER_PORT 一致
+  - hostname: token.yourdomain.com
+    service: http://localhost:8001
+  # Claude Code Manager — 主域名
+  - hostname: yourdomain.com
+    service: http://localhost:8000
+  - service: http_status:404
+```
+
+> **注意**：如果修改了 `PORT` 或 `TOKEN_MANAGER_PORT`，需同步修改 `~/.cloudflared/config.yml` 中对应的端口号。
 
 ## 架构要点
 

@@ -49,7 +49,9 @@ claude-manager/
 │       ├── task_queue.py        # 优先级队列 (asc = 优先级越高)
 │       ├── worktree_manager.py  # Git worktree 创建/合并/删除 + rebase+push
 │       ├── ws_broadcaster.py    # WebSocket channel 广播
-│       └── whisper_client.py    # OpenAI Whisper 客户端
+│       ├── whisper_client.py    # OpenAI Whisper 客户端
+│       ├── backup_service.py    # 数据库备份 (auto-backup SDK 封装, 可选)
+│       └── token_manager_service.py  # token-usage-manager 子进程管理 (可选)
 ├── frontend/
 │   └── src/
 │       ├── api/client.ts        # API 客户端 + 类型 (401 自动登出, 动态 base URL)
@@ -79,6 +81,8 @@ claude-manager/
 - **Resume**: `claude -p [follow-up] --resume [session_id]` — 必须使用和原始 session 相同的 cwd
 - **环境变量清理**: 生成子进程前必须 unset `CLAUDECODE` / `CLAUDE_CODE`，避免嵌套检测
 - **停止顺序**: SIGTERM → 等 10s → SIGKILL
+- **备份服务**: `BackupService`（`backend/services/backup_service.py`）封装 auto-backup SDK，在 lifespan 中以后台线程（APScheduler）运行，支持 local / s3 / oss；`BACKUP_ENABLED=false` 时完全不加载
+- **Token Manager**: `TokenManagerService`（`backend/services/token_manager_service.py`）以 `subprocess.Popen` 启动 token-usage-manager，监听 `TOKEN_MANAGER_PORT`（默认 8001）；通过 Cloudflare Tunnel 子域名路由；修改 `PORT` 或 `TOKEN_MANAGER_PORT` 后须同步更新 `~/.cloudflared/config.yml`；`TOKEN_MANAGER_ENABLED=false` 时不启动
 - **WebSocket channels**: `instance:{id}`, `task:{id}`, `tasks`, `system`
 - **认证**: 除 `/api/system/health` 和 `/api/auth/login` 外，所有 API 需要 `Authorization: Bearer <token>`
 - **前端 type 导入**: 用 `import type { X }` 导入类型，`import { api }` 导入值（Vite 会去除 type-only exports）
