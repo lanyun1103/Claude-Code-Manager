@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
 import type { Project, GlobalSettings } from '../api/client';
-import { Trash2, RotateCcw, FolderGit2, Globe, HardDrive, Plus, Settings, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Trash2, RotateCcw, FolderGit2, Globe, HardDrive, Plus, Settings, X, ChevronDown, ChevronUp, GripVertical, Tag } from 'lucide-react';
 
 // ── Shared: identity warning ──────────────────────────────────────────────────
 
@@ -13,6 +13,112 @@ function IdentityWarning({ name, email }: { name: string; email: string }) {
     <p className="col-span-2 text-xs text-amber-400">
       姓名和邮箱必须同时填写才会生效，否则将使用全局配置
     </p>
+  );
+}
+
+// ── Tag color (deterministic from tag name) ───────────────────────────────────
+
+const TAG_COLORS = [
+  'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+  'bg-sky-500/20 text-sky-300 border-sky-500/30',
+  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+  'bg-amber-500/20 text-amber-300 border-amber-500/30',
+  'bg-rose-500/20 text-rose-300 border-rose-500/30',
+  'bg-violet-500/20 text-violet-300 border-violet-500/30',
+  'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+  'bg-orange-500/20 text-orange-300 border-orange-500/30',
+];
+
+function tagColor(tag: string): string {
+  let hash = 0;
+  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
+  return TAG_COLORS[hash % TAG_COLORS.length];
+}
+
+// ── Inline tag editor ─────────────────────────────────────────────────────────
+
+function TagEditor({
+  tags,
+  allTags,
+  onSave,
+}: {
+  tags: string[];
+  allTags: string[];
+  onSave: (tags: string[]) => void;
+}) {
+  const [input, setInput] = useState('');
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const suggestions = allTags.filter(
+    (t) => t.toLowerCase().includes(input.toLowerCase()) && !tags.includes(t)
+  );
+
+  const addTag = (tag: string) => {
+    const trimmed = tag.trim().toLowerCase();
+    if (!trimmed || tags.includes(trimmed)) return;
+    onSave([...tags, trimmed]);
+    setInput('');
+    setShowSuggestions(false);
+  };
+
+  const removeTag = (tag: string) => {
+    onSave(tags.filter((t) => t !== tag));
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(input);
+    } else if (e.key === 'Escape') {
+      setInput('');
+      setShowSuggestions(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1.5 flex-wrap">
+      {tags.map((tag) => (
+        <span
+          key={tag}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${tagColor(tag)}`}
+        >
+          {tag}
+          <button
+            onClick={() => removeTag(tag)}
+            className="opacity-60 hover:opacity-100 leading-none"
+          >
+            <X size={10} />
+          </button>
+        </span>
+      ))}
+
+      <div className="relative">
+        <input
+          ref={inputRef}
+          value={input}
+          onChange={(e) => { setInput(e.target.value); setShowSuggestions(true); }}
+          onKeyDown={handleKeyDown}
+          onFocus={() => setShowSuggestions(true)}
+          onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+          placeholder="+ tag"
+          className="w-16 bg-transparent text-xs text-gray-400 placeholder-gray-600 outline-none focus:placeholder-gray-500"
+        />
+        {showSuggestions && suggestions.length > 0 && (
+          <div className="absolute top-full left-0 mt-1 bg-gray-700 border border-gray-600 rounded shadow-lg z-20 min-w-[120px]">
+            {suggestions.slice(0, 6).map((s) => (
+              <button
+                key={s}
+                onMouseDown={() => addTag(s)}
+                className="w-full text-left px-3 py-1.5 text-xs text-gray-300 hover:bg-gray-600"
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -506,16 +612,23 @@ function GitConfigModal({ project, onClose, onSaved }: { project: Project; onClo
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [allTags, setAllTags] = useState<string[]>([]);
+  const [tagFilter, setTagFilter] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState<Record<number, boolean>>({});
   const [showCreate, setShowCreate] = useState(false);
   const [editingGit, setEditingGit] = useState<Project | null>(null);
   const [showGlobalGit, setShowGlobalGit] = useState(false);
 
+  // Drag state
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOverId, setDragOverId] = useState<number | null>(null);
+
   const refresh = useCallback(async () => {
     try {
-      const list = await api.listProjects();
+      const [list, tags] = await Promise.all([api.listProjects(), api.listProjectTags()]);
       setProjects(list);
+      setAllTags(tags);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -550,12 +663,75 @@ export function ProjectsPage() {
     }
   };
 
+  const handleTagSave = async (project: Project, tags: string[]) => {
+    try {
+      await api.updateProject(project.id, { tags });
+      setProjects((prev) => prev.map((p) => p.id === project.id ? { ...p, tags } : p));
+      // Refresh allTags
+      const newAllTags = new Set(allTags);
+      tags.forEach((t) => newAllTags.add(t));
+      setAllTags(Array.from(newAllTags).sort());
+    } catch (e) {
+      setError(String(e));
+    }
+  };
+
+  // ── Drag handlers ──
+  const handleDragStart = (id: number) => (e: React.DragEvent) => {
+    setDraggingId(id);
+    e.dataTransfer.effectAllowed = 'move';
+  };
+
+  const handleDragOver = (id: number) => (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    if (id !== draggingId) setDragOverId(id);
+  };
+
+  const handleDrop = (targetId: number) => async (e: React.DragEvent) => {
+    e.preventDefault();
+    if (draggingId === null || draggingId === targetId) {
+      setDraggingId(null);
+      setDragOverId(null);
+      return;
+    }
+
+    // Reorder locally
+    const reordered = [...projects];
+    const fromIdx = reordered.findIndex((p) => p.id === draggingId);
+    const toIdx = reordered.findIndex((p) => p.id === targetId);
+    const [moved] = reordered.splice(fromIdx, 1);
+    reordered.splice(toIdx, 0, moved);
+
+    // Assign new sort_order values (0, 1, 2, ...)
+    const updated = reordered.map((p, i) => ({ ...p, sort_order: i }));
+    setProjects(updated);
+    setDraggingId(null);
+    setDragOverId(null);
+
+    try {
+      await api.reorderProjects(updated.map((p) => ({ id: p.id, sort_order: p.sort_order })));
+    } catch (e) {
+      setError(String(e));
+      await refresh(); // revert on error
+    }
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    setDragOverId(null);
+  };
+
   const statusColor: Record<string, string> = {
     ready: 'bg-green-500',
     pending: 'bg-yellow-500',
     cloning: 'bg-blue-500 animate-pulse',
     error: 'bg-red-500',
   };
+
+  const filteredProjects = tagFilter
+    ? projects.filter((p) => p.tags.includes(tagFilter))
+    : projects;
 
   return (
     <div className="space-y-4">
@@ -578,19 +754,73 @@ export function ProjectsPage() {
         </div>
       </div>
 
+      {/* Tag filter */}
+      {allTags.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1 text-xs text-gray-500">
+            <Tag size={12} /> Tags:
+          </span>
+          <button
+            onClick={() => setTagFilter('')}
+            className={`px-2 py-0.5 rounded text-xs transition-colors border ${
+              tagFilter === ''
+                ? 'bg-indigo-600 text-white border-indigo-500'
+                : 'bg-gray-800 text-gray-400 border-gray-700 hover:bg-gray-700'
+            }`}
+          >
+            All
+          </button>
+          {allTags.map((tag) => (
+            <button
+              key={tag}
+              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
+              className={`px-2 py-0.5 rounded text-xs transition-colors border ${
+                tagFilter === tag
+                  ? `${tagColor(tag)} opacity-100`
+                  : `${tagColor(tag)} opacity-60 hover:opacity-100`
+              }`}
+            >
+              {tag}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error && (
         <div className="bg-red-500/20 text-red-400 px-4 py-2 rounded text-sm">
           Error: {error}
         </div>
       )}
 
-      {projects.length === 0 ? (
-        <p className="text-gray-400 text-sm">No projects yet.</p>
+      {filteredProjects.length === 0 ? (
+        <p className="text-gray-400 text-sm">{projects.length === 0 ? 'No projects yet.' : 'No projects match this tag.'}</p>
       ) : (
         <div className="space-y-3">
-          {projects.map((p) => (
-            <div key={p.id} className="bg-gray-800 rounded-lg p-3 sm:p-4 space-y-2">
+          {filteredProjects.map((p) => (
+            <div
+              key={p.id}
+              draggable
+              onDragStart={handleDragStart(p.id)}
+              onDragOver={handleDragOver(p.id)}
+              onDrop={handleDrop(p.id)}
+              onDragEnd={handleDragEnd}
+              className={`bg-gray-800 rounded-lg p-3 sm:p-4 space-y-2 transition-opacity ${
+                draggingId === p.id ? 'opacity-40' : 'opacity-100'
+              } ${
+                dragOverId === p.id && draggingId !== p.id
+                  ? 'border-2 border-dashed border-indigo-500'
+                  : 'border-2 border-transparent'
+              }`}
+            >
               <div className="flex items-start gap-3">
+                {/* Drag handle */}
+                <div
+                  className="mt-1 text-gray-600 hover:text-gray-400 cursor-grab active:cursor-grabbing select-none"
+                  title="Drag to reorder"
+                >
+                  <GripVertical size={18} />
+                </div>
+
                 {/* Icon */}
                 <div className="mt-1 text-gray-400">
                   <FolderGit2 size={20} />
@@ -629,11 +859,20 @@ export function ProjectsPage() {
                     {p.git_credential_type && <span>Creds: {p.git_credential_type}</span>}
                     <span>Created: {new Date(p.created_at).toLocaleDateString()}</span>
                   </div>
+
+                  {/* Tags row */}
+                  <div className="pt-0.5">
+                    <TagEditor
+                      tags={p.tags}
+                      allTags={allTags}
+                      onSave={(tags) => handleTagSave(p, tags)}
+                    />
+                  </div>
                 </div>
               </div>
 
               {/* Actions */}
-              <div className="flex items-center gap-3 pl-8 sm:pl-0 sm:justify-end">
+              <div className="flex items-center gap-3 pl-10 sm:pl-0 sm:justify-end">
                 {/* Show in selector toggle */}
                 <label className="flex items-center gap-2 cursor-pointer select-none" title="Show in task project dropdown">
                   <span className="text-xs text-gray-400">Selector</span>

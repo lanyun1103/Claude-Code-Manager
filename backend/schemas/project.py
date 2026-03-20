@@ -7,6 +7,8 @@ class ProjectCreate(BaseModel):
     name: str
     git_url: str | None = None
     default_branch: str = "main"
+    sort_order: int = 0
+    tags: list[str] = []
     git_author_name: str | None = None
     git_author_email: str | None = None
     git_credential_type: str | None = None  # "ssh" | "https" | None
@@ -21,12 +23,19 @@ class ProjectUpdate(BaseModel):
     has_remote: bool | None = None
     default_branch: str | None = None
     show_in_selector: bool | None = None
+    sort_order: int | None = None
+    tags: list[str] | None = None
     git_author_name: str | None = None
     git_author_email: str | None = None
     git_credential_type: str | None = None
     git_ssh_key_path: str | None = None
     git_https_username: str | None = None
     git_https_token: str | None = None
+
+
+class ProjectReorderItem(BaseModel):
+    id: int
+    sort_order: int
 
 
 class ProjectResponse(BaseModel):
@@ -39,6 +48,8 @@ class ProjectResponse(BaseModel):
     status: str
     error_message: str | None
     show_in_selector: bool
+    sort_order: int
+    tags: list[str]
     git_author_name: str | None
     git_author_email: str | None
     git_credential_type: str | None

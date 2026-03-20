@@ -196,7 +196,7 @@ class TestLegacyMigration:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar()
-            assert version == "72bb07679317", f"Expected head revision, got {version}"
+            assert version == "69d5cf74de62", f"Expected head revision, got {version}"
 
         # Verify new columns exist
         task_cols = _get_table_columns(engine, "tasks")
@@ -205,6 +205,10 @@ class TestLegacyMigration:
 
         log_cols = _get_table_columns(engine, "log_entries")
         assert "loop_iteration" in log_cols
+
+        project_cols = _get_table_columns(engine, "projects")
+        assert "sort_order" in project_cols
+        assert "tags" in project_cols
 
         # Verify existing data survived
         with engine.connect() as conn:
@@ -267,10 +271,14 @@ class TestFreshMigration:
         log_cols = _get_table_columns(engine, "log_entries")
         assert "loop_iteration" in log_cols
 
+        project_cols = _get_table_columns(engine, "projects")
+        assert "sort_order" in project_cols
+        assert "tags" in project_cols
+
         # Verify alembic_version at head
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "72bb07679317"
+            assert version == "69d5cf74de62"
 
         engine.dispose()
 
@@ -312,7 +320,7 @@ class TestAlreadyMigratedDb:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "72bb07679317"
+            assert version == "69d5cf74de62"
         engine.dispose()
 
 
@@ -470,5 +478,5 @@ class TestInitDbLogic:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "72bb07679317"
+            assert version == "69d5cf74de62"
         engine.dispose()

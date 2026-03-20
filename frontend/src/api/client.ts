@@ -57,6 +57,8 @@ export interface Project {
   status: string;
   error_message: string | null;
   show_in_selector: boolean;
+  sort_order: number;
+  tags: string[];
   git_author_name: string | null;
   git_author_email: string | null;
   git_credential_type: string | null;  // "ssh" | "https" | null
@@ -85,6 +87,7 @@ export interface Task {
   loop_progress: string | null;
   plan_content: string | null;
   plan_approved: boolean | null;
+  starred: boolean;
   archived: boolean;
   session_id: string | null;
   error_message: string | null;
@@ -151,10 +154,13 @@ export interface UploadResult {
 export const api = {
   // Projects
   listProjects: () => request<Project[]>('/api/projects'),
+  listProjectTags: () => request<string[]>('/api/projects/tags'),
   createProject: (data: {
     name: string;
     git_url?: string;
     default_branch?: string;
+    sort_order?: number;
+    tags?: string[];
     git_author_name?: string;
     git_author_email?: string;
     git_credential_type?: string;
@@ -163,8 +169,10 @@ export const api = {
     git_https_token?: string;
   }) =>
     request<Project>('/api/projects', { method: 'POST', body: JSON.stringify(data) }),
-  updateProject: (id: number, data: Partial<Pick<Project, 'name' | 'show_in_selector' | 'git_author_name' | 'git_author_email' | 'git_credential_type' | 'git_ssh_key_path' | 'git_https_username' | 'git_https_token'>>) =>
+  updateProject: (id: number, data: Partial<Pick<Project, 'name' | 'show_in_selector' | 'sort_order' | 'tags' | 'git_author_name' | 'git_author_email' | 'git_credential_type' | 'git_ssh_key_path' | 'git_https_username' | 'git_https_token'>>) =>
     request<Project>(`/api/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  reorderProjects: (orders: { id: number; sort_order: number }[]) =>
+    request<Project[]>('/api/projects/reorder', { method: 'PUT', body: JSON.stringify(orders) }),
   deleteProject: (id: number) =>
     request<{ ok: boolean }>(`/api/projects/${id}`, { method: 'DELETE' }),
   recloneProject: (id: number) =>
@@ -203,8 +211,15 @@ export const api = {
   },
 
   // Tasks
-  listTasks: (status?: string, includeArchived?: boolean) =>
-    request<Task[]>(`/api/tasks?${new URLSearchParams({ ...(status ? { status } : {}), ...(includeArchived ? { include_archived: 'true' } : {}) })}`),
+  listTasks: (status?: string, includeArchived?: boolean, projectId?: number, starred?: boolean) =>
+    request<Task[]>(`/api/tasks?${new URLSearchParams({
+      ...(status ? { status } : {}),
+      ...(includeArchived ? { include_archived: 'true' } : {}),
+      ...(projectId != null ? { project_id: String(projectId) } : {}),
+      ...(starred != null ? { starred: String(starred) } : {}),
+    })}`),
+  starTask: (id: number) =>
+    request<Task>(`/api/tasks/${id}/star`, { method: 'POST' }),
   archiveTask: (id: number) =>
     request<Task>(`/api/tasks/${id}/archive`, { method: 'POST' }),
   stopTaskSession: (id: number) =>

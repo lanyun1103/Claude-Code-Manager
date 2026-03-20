@@ -258,7 +258,7 @@ class InstanceManager:
             await db.execute(
                 update(Instance)
                 .where(Instance.id == instance_id)
-                .values(status="idle", pid=None, current_task_id=None)
+                .values(status="stopped", pid=None, current_task_id=None)
             )
             await db.commit()
 

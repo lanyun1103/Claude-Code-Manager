@@ -12,6 +12,9 @@ export function TasksPage() {
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [filter, setFilter] = useState<string>('');
+  const [tagFilter, setTagFilter] = useState<string>('');
+  const [projectFilter, setProjectFilter] = useState<number | undefined>(undefined);
+  const [starredFilter, setStarredFilter] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
   const [chatTask, setChatTask] = useState<Task | null>(null);
   const chatTaskRef = useRef<Task | null>(null);
@@ -20,7 +23,7 @@ export function TasksPage() {
   const refresh = useCallback(async () => {
     try {
       const [filtered, all, projs] = await Promise.all([
-        api.listTasks(filter || undefined, showArchived),
+        api.listTasks(filter || undefined, showArchived, projectFilter, starredFilter || undefined),
         api.listTasks(undefined, showArchived),
         api.listProjects(),
       ]);
@@ -36,7 +39,7 @@ export function TasksPage() {
     } catch (e) {
       console.error('Failed to load tasks:', e);
     }
-  }, [filter, showArchived]);
+  }, [filter, showArchived, projectFilter, starredFilter]);
 
   useEffect(() => {
     refresh();
@@ -45,6 +48,14 @@ export function TasksPage() {
   }, [refresh]);
 
   const filters = ['', 'pending', 'in_progress', 'plan_review', 'completed', 'failed'];
+
+  // Collect all unique tags from loaded projects
+  const allProjectTags = Array.from(new Set(projects.flatMap((p) => p.tags))).sort();
+
+  // Projects filtered by tag (for the project dropdown)
+  const tagFilteredProjects = tagFilter
+    ? projects.filter((p) => p.tags.includes(tagFilter))
+    : projects;
 
   return (
     <div className="space-y-4">
@@ -66,9 +77,56 @@ export function TasksPage() {
             {f || 'All'}
           </button>
         ))}
+
+        <span className="w-px h-5 bg-gray-700 mx-1" />
+
+        {/* Tag filter */}
+        {allProjectTags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => {
+              setTagFilter(e.target.value);
+              // Clear project filter if it won't be in the new tag-filtered list
+              if (e.target.value && projectFilter !== undefined) {
+                const filtered = projects.filter((p) => p.tags.includes(e.target.value));
+                if (!filtered.some((p) => p.id === projectFilter)) {
+                  setProjectFilter(undefined);
+                }
+              }
+            }}
+            className="px-2 py-1 rounded text-xs font-medium bg-gray-800 text-gray-400 border-none outline-none cursor-pointer hover:bg-gray-700 transition-colors"
+          >
+            <option value="">All Tags</option>
+            {allProjectTags.map((tag) => (
+              <option key={tag} value={tag}>{tag}</option>
+            ))}
+          </select>
+        )}
+
+        <select
+          value={projectFilter ?? ''}
+          onChange={(e) => setProjectFilter(e.target.value ? Number(e.target.value) : undefined)}
+          className="px-2 py-1 rounded text-xs font-medium bg-gray-800 text-gray-400 border-none outline-none cursor-pointer hover:bg-gray-700 transition-colors"
+        >
+          <option value="">All Projects</option>
+          {tagFilteredProjects.map((p) => (
+            <option key={p.id} value={p.id}>{p.name}</option>
+          ))}
+        </select>
+
+        <button
+          onClick={() => setStarredFilter(!starredFilter)}
+          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+            starredFilter
+              ? 'bg-yellow-600 text-white'
+              : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
+          }`}
+        >
+          ★ Starred
+        </button>
         <button
           onClick={() => setShowArchived(!showArchived)}
-          className={`px-3 py-1 rounded text-xs font-medium transition-colors ml-2 ${
+          className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
             showArchived
               ? 'bg-amber-600 text-white'
               : 'bg-gray-800 text-gray-400 hover:bg-gray-700'

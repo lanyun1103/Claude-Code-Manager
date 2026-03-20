@@ -9,7 +9,7 @@ from backend.config import settings
 from backend.database import get_db, async_session
 from backend.models.project import Project
 from backend.models.global_settings import GlobalSettings
-from backend.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse
+from backend.schemas.project import ProjectCreate, ProjectUpdate, ProjectResponse, ProjectReorderItem
 from backend.services.git_config import merge_git_config, settings_to_dict
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -17,7 +17,36 @@ router = APIRouter(prefix="/api/projects", tags=["projects"])
 
 @router.get("", response_model=list[ProjectResponse])
 async def list_projects(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(Project).order_by(Project.name))
+    result = await db.execute(
+        select(Project).order_by(Project.sort_order.asc(), Project.name.asc())
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/tags", response_model=list[str])
+async def list_project_tags(db: AsyncSession = Depends(get_db)):
+    """Return all unique tags across all projects, sorted alphabetically."""
+    result = await db.execute(select(Project.tags))
+    all_tags: set[str] = set()
+    for (tags,) in result:
+        if tags:
+            all_tags.update(tags)
+    return sorted(all_tags)
+
+
+@router.put("/reorder", response_model=list[ProjectResponse])
+async def reorder_projects(
+    body: list[ProjectReorderItem], db: AsyncSession = Depends(get_db)
+):
+    """Bulk-update sort_order for a list of projects."""
+    for item in body:
+        await db.execute(
+            update(Project).where(Project.id == item.id).values(sort_order=item.sort_order)
+        )
+    await db.commit()
+    result = await db.execute(
+        select(Project).order_by(Project.sort_order.asc(), Project.name.asc())
+    )
     return list(result.scalars().all())
 
 
@@ -39,6 +68,8 @@ async def create_project(body: ProjectCreate, db: AsyncSession = Depends(get_db)
         default_branch=body.default_branch,
         local_path=local_path,
         status="pending",
+        sort_order=body.sort_order,
+        tags=body.tags,
         git_author_name=body.git_author_name,
         git_author_email=body.git_author_email,
         git_credential_type=body.git_credential_type,
@@ -295,6 +326,24 @@ async def _clone_repo(project_id: int, git_url: str, local_path: str, project_na
         if not os.path.exists(claude_md_path):
             with open(claude_md_path, "w") as f:
                 f.write(_generate_claude_md(project_name, git_url, default_branch))
+
+            # Stage and commit CLAUDE.md so it's not left untracked
+            proc = await asyncio.create_subprocess_exec(
+                "git", "add", "CLAUDE.md",
+                cwd=local_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+
+            proc = await asyncio.create_subprocess_exec(
+                "git", "commit", "-m", "Add CLAUDE.md for Claude Code Manager",
+                cwd=local_path,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            await proc.communicate()
+            # Don't fail on commit error — repo may have no user config yet
 
         async with async_session() as db:
             await db.execute(

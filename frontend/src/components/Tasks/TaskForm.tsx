@@ -22,6 +22,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
   const [todoFilePath, setTodoFilePath] = useState('');
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [tagFilter, setTagFilter] = useState<string>('');
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [selectedSecretIds, setSelectedSecretIds] = useState<number[]>([]);
@@ -166,17 +167,59 @@ export function TaskForm({ onCreated }: TaskFormProps) {
         ))}
       </div>
       <div className="space-y-2">
+        {/* Tag filter pills */}
+        {(() => {
+          const allTags = Array.from(new Set(projects.filter((p) => p.show_in_selector).flatMap((p) => p.tags))).sort();
+          if (allTags.length === 0) return null;
+          return (
+            <div className="flex gap-1.5 flex-wrap">
+              <button
+                type="button"
+                onClick={() => setTagFilter('')}
+                className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                  tagFilter === '' ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                }`}
+              >
+                All
+              </button>
+              {allTags.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() => {
+                    setTagFilter(tagFilter === tag ? '' : tag);
+                    // Clear project selection if it doesn't match new tag
+                    if (tagFilter !== tag && projectId) {
+                      const proj = projects.find((p) => p.id === Number(projectId));
+                      if (proj && !proj.tags.includes(tag)) {
+                        setProjectId('');
+                        setIsNewProject(false);
+                      }
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded text-xs transition-colors ${
+                    tagFilter === tag ? 'bg-indigo-600 text-white' : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
+                  }`}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+          );
+        })()}
         <select
           className="w-full bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
           value={isNewProject ? NEW_PROJECT_VALUE : projectId}
           onChange={(e) => handleProjectChange(e.target.value)}
         >
           <option value="">Select project...</option>
-          {projects.filter((p) => p.show_in_selector).map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} {p.status !== 'ready' ? `(${p.status})` : ''}
-            </option>
-          ))}
+          {projects
+            .filter((p) => p.show_in_selector && (!tagFilter || p.tags.includes(tagFilter)))
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} {p.status !== 'ready' ? `(${p.status})` : ''}
+              </option>
+            ))}
           <option value={NEW_PROJECT_VALUE}>+ New project</option>
         </select>
         {isNewProject && (
