@@ -145,6 +145,13 @@ export interface Secret {
   updated_at: string;
 }
 
+export interface TagItem {
+  id: number;
+  name: string;
+  color: string;
+  created_at: string;
+}
+
 export interface UploadResult {
   id: string;
   filename: string | null;
@@ -192,6 +199,15 @@ export const api = {
     request<Secret>(`/api/secrets/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
   deleteSecret: (id: number) =>
     request<{ ok: boolean }>(`/api/secrets/${id}`, { method: 'DELETE' }),
+
+  // Tags
+  listTags: () => request<TagItem[]>('/api/tags'),
+  createTag: (data: { name: string; color: string }) =>
+    request<TagItem>('/api/tags', { method: 'POST', body: JSON.stringify(data) }),
+  updateTag: (id: number, data: { name?: string; color?: string }) =>
+    request<TagItem>(`/api/tags/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+  deleteTag: (id: number) =>
+    request<{ ok: boolean }>(`/api/tags/${id}`, { method: 'DELETE' }),
 
   // Uploads
   uploadImages: (files: File[]): Promise<UploadResult[]> => {

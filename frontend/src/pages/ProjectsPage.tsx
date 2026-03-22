@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
-import type { Project, GlobalSettings } from '../api/client';
+import type { Project, GlobalSettings, TagItem } from '../api/client';
 import { Trash2, RotateCcw, FolderGit2, Globe, HardDrive, Plus, Settings, X, ChevronDown, ChevronUp, GripVertical, Tag } from 'lucide-react';
+import { resolveTagColor } from '../components/TagColors';
+import { TagManager } from '../components/TagManager';
 
 // ── Shared: identity warning ──────────────────────────────────────────────────
 
@@ -16,24 +18,7 @@ function IdentityWarning({ name, email }: { name: string; email: string }) {
   );
 }
 
-// ── Tag color (deterministic from tag name) ───────────────────────────────────
-
-const TAG_COLORS = [
-  'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-  'bg-sky-500/20 text-sky-300 border-sky-500/30',
-  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  'bg-amber-500/20 text-amber-300 border-amber-500/30',
-  'bg-rose-500/20 text-rose-300 border-rose-500/30',
-  'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-  'bg-orange-500/20 text-orange-300 border-orange-500/30',
-];
-
-function tagColor(tag: string): string {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = (hash * 31 + tag.charCodeAt(i)) & 0xffff;
-  return TAG_COLORS[hash % TAG_COLORS.length];
-}
+// ── Tag color (resolved from stored Tag or fallback hash) ────────────────────
 
 // ── Inline tag editor ─────────────────────────────────────────────────────────
 
@@ -41,10 +26,12 @@ function TagEditor({
   tags,
   allTags,
   onSave,
+  tagColorMap = {},
 }: {
   tags: string[];
   allTags: string[];
   onSave: (tags: string[]) => void;
+  tagColorMap?: Record<string, string>;
 }) {
   const [input, setInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -78,10 +65,12 @@ function TagEditor({
 
   return (
     <div className="flex items-center gap-1.5 flex-wrap">
-      {tags.map((tag) => (
+      {tags.map((tag) => {
+        const c = resolveTagColor(tag, tagColorMap[tag]);
+        return (
         <span
           key={tag}
-          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${tagColor(tag)}`}
+          className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs border ${c.bg} ${c.text} ${c.border}`}
         >
           {tag}
           <button
@@ -91,7 +80,8 @@ function TagEditor({
             <X size={10} />
           </button>
         </span>
-      ))}
+        );
+      })}
 
       <div className="relative">
         <input
@@ -619,6 +609,8 @@ export function ProjectsPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [editingGit, setEditingGit] = useState<Project | null>(null);
   const [showGlobalGit, setShowGlobalGit] = useState(false);
+  const [showTagManager, setShowTagManager] = useState(false);
+  const [tagItems, setTagItems] = useState<TagItem[]>([]);
 
   // Drag state
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -626,9 +618,10 @@ export function ProjectsPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const [list, tags] = await Promise.all([api.listProjects(), api.listProjectTags()]);
+      const [list, tags, tagList] = await Promise.all([api.listProjects(), api.listProjectTags(), api.listTags()]);
       setProjects(list);
       setAllTags(tags);
+      setTagItems(tagList);
       setError(null);
     } catch (e) {
       setError(String(e));
@@ -729,6 +722,10 @@ export function ProjectsPage() {
     error: 'bg-red-500',
   };
 
+  // Build tag name → color key map from stored tags
+  const tagColorMap: Record<string, string> = {};
+  for (const t of tagItems) tagColorMap[t.name] = t.color;
+
   const filteredProjects = tagFilter
     ? projects.filter((p) => p.tags.includes(tagFilter))
     : projects;
@@ -744,6 +741,13 @@ export function ProjectsPage() {
             title="Global Git Config"
           >
             <Settings size={14} /> Global Git Config
+          </button>
+          <button
+            onClick={() => setShowTagManager(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-300 border border-gray-600 rounded hover:bg-gray-700"
+            title="Manage Tags"
+          >
+            <Tag size={14} /> Tags
           </button>
           <button
             onClick={() => setShowCreate(true)}
@@ -770,19 +774,20 @@ export function ProjectsPage() {
           >
             All
           </button>
-          {allTags.map((tag) => (
-            <button
-              key={tag}
-              onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
-              className={`px-2 py-0.5 rounded text-xs transition-colors border ${
-                tagFilter === tag
-                  ? `${tagColor(tag)} opacity-100`
-                  : `${tagColor(tag)} opacity-60 hover:opacity-100`
-              }`}
-            >
-              {tag}
-            </button>
-          ))}
+          {allTags.map((tag) => {
+            const c = resolveTagColor(tag, tagColorMap[tag]);
+            return (
+              <button
+                key={tag}
+                onClick={() => setTagFilter(tagFilter === tag ? '' : tag)}
+                className={`px-2 py-0.5 rounded text-xs transition-colors border ${c.bg} ${c.text} ${c.border} ${
+                  tagFilter === tag ? 'opacity-100' : 'opacity-60 hover:opacity-100'
+                }`}
+              >
+                {tag}
+              </button>
+            );
+          })}
         </div>
       )}
 
@@ -866,6 +871,7 @@ export function ProjectsPage() {
                       tags={p.tags}
                       allTags={allTags}
                       onSave={(tags) => handleTagSave(p, tags)}
+                      tagColorMap={tagColorMap}
                     />
                   </div>
                 </div>
@@ -934,6 +940,7 @@ export function ProjectsPage() {
       {showCreate && <CreateModal onClose={() => setShowCreate(false)} onCreated={refresh} />}
       {editingGit && <GitConfigModal project={editingGit} onClose={() => setEditingGit(null)} onSaved={refresh} />}
       {showGlobalGit && <GlobalGitConfigModal onClose={() => setShowGlobalGit(false)} />}
+      {showTagManager && <TagManager onClose={() => setShowTagManager(false)} onChanged={refresh} />}
     </div>
   );
 }

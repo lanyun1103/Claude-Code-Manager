@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../api/client';
-import type { Task, Project } from '../api/client';
+import type { Task, Project, TagItem } from '../api/client';
 import { TaskForm } from '../components/Tasks/TaskForm';
 import { TaskList } from '../components/Tasks/TaskList';
 import { PlanPanel } from '../components/PlanReview/PlanPanel';
@@ -17,20 +17,23 @@ export function TasksPage() {
   const [projectFilter, setProjectFilter] = useState<number | undefined>(undefined);
   const [starredFilter, setStarredFilter] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [tagItems, setTagItems] = useState<TagItem[]>([]);
   const [chatTask, setChatTask] = useState<Task | null>(null);
   const chatTaskRef = useRef<Task | null>(null);
   chatTaskRef.current = chatTask;
 
   const refresh = useCallback(async () => {
     try {
-      const [filtered, all, projs] = await Promise.all([
+      const [filtered, all, projs, tags] = await Promise.all([
         api.listTasks(filter || undefined, showArchived, projectFilter, starredFilter || undefined),
         api.listTasks(undefined, showArchived),
         api.listProjects(),
+        api.listTags(),
       ]);
       setTasks(filtered);
       setAllTasks(all);
       setProjects(projs);
+      setTagItems(tags);
       // Update chatTask if it's open (to get latest session_id etc.)
       const current = chatTaskRef.current;
       if (current) {
@@ -52,6 +55,10 @@ export function TasksPage() {
 
   // Collect all unique tags from loaded projects
   const allProjectTags = Array.from(new Set(projects.flatMap((p) => p.tags))).sort();
+
+  // Build tag color map
+  const tagColorMap: Record<string, string> = {};
+  for (const t of tagItems) tagColorMap[t.name] = t.color;
 
   // Projects filtered by tag (for the project dropdown)
   const tagFilteredProjects = tagFilter
@@ -109,6 +116,7 @@ export function TasksPage() {
           value={projectFilter}
           onChange={(v) => setProjectFilter(v ? Number(v) : undefined)}
           placeholder="All Projects"
+          tagColorMap={tagColorMap}
         />
 
         <button

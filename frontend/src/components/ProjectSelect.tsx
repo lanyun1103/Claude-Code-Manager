@@ -1,30 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import type { Project } from '../api/client';
 import { ChevronDown } from 'lucide-react';
+import { resolveTagColor } from './TagColors';
 
-// Stable color palette for tags — same tag always gets the same color
-const TAG_COLORS = [
-  'bg-blue-500/20 text-blue-300',
-  'bg-emerald-500/20 text-emerald-300',
-  'bg-purple-500/20 text-purple-300',
-  'bg-orange-500/20 text-orange-300',
-  'bg-pink-500/20 text-pink-300',
-  'bg-cyan-500/20 text-cyan-300',
-  'bg-yellow-500/20 text-yellow-300',
-  'bg-rose-500/20 text-rose-300',
-  'bg-teal-500/20 text-teal-300',
-  'bg-indigo-500/20 text-indigo-300',
-];
-
-function tagColor(tag: string): string {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = ((hash << 5) - hash + tag.charCodeAt(i)) | 0;
-  return TAG_COLORS[Math.abs(hash) % TAG_COLORS.length];
-}
-
-function TagBadge({ tag }: { tag: string }) {
+function TagBadge({ tag, colorKey }: { tag: string; colorKey?: string }) {
+  const c = resolveTagColor(tag, colorKey);
   return (
-    <span className={`inline-block px-1.5 py-0 rounded text-[10px] font-medium leading-4 ${tagColor(tag)}`}>
+    <span className={`inline-block px-1.5 py-0 rounded text-[10px] font-medium leading-4 ${c.bg} ${c.text}`}>
       {tag}
     </span>
   );
@@ -38,6 +20,7 @@ interface ProjectSelectProps {
   extraOptions?: { value: string; label: string }[];
   className?: string;
   showStatus?: boolean;
+  tagColorMap?: Record<string, string>;
 }
 
 export function ProjectSelect({
@@ -48,6 +31,7 @@ export function ProjectSelect({
   extraOptions,
   className = '',
   showStatus = false,
+  tagColorMap = {},
 }: ProjectSelectProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -74,7 +58,7 @@ export function ProjectSelect({
           <span className="truncate">{displayValue}</span>
           {selected && selected.tags.length > 0 && (
             <span className="flex gap-1 shrink-0">
-              {selected.tags.map((t) => <TagBadge key={t} tag={t} />)}
+              {selected.tags.map((t) => <TagBadge key={t} tag={t} colorKey={tagColorMap[t]} />)}
             </span>
           )}
           {showStatus && selected && selected.status !== 'ready' && (
@@ -86,7 +70,6 @@ export function ProjectSelect({
 
       {open && (
         <div className="absolute z-50 mt-1 w-full min-w-[220px] max-h-60 overflow-auto bg-gray-800 border border-gray-700 rounded-lg shadow-xl">
-          {/* Empty / placeholder option */}
           <div
             onClick={() => { onChange(''); setOpen(false); }}
             className={`px-3 py-1.5 text-xs cursor-pointer hover:bg-gray-700 transition-colors ${
@@ -107,7 +90,7 @@ export function ProjectSelect({
               <span className="truncate">{p.name}</span>
               {p.tags.length > 0 && (
                 <span className="flex gap-1 shrink-0 ml-auto">
-                  {p.tags.map((t) => <TagBadge key={t} tag={t} />)}
+                  {p.tags.map((t) => <TagBadge key={t} tag={t} colorKey={tagColorMap[t]} />)}
                 </span>
               )}
               {showStatus && p.status !== 'ready' && (

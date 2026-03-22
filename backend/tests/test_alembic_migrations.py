@@ -196,7 +196,7 @@ class TestLegacyMigration:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar()
-            assert version == "e1f2a3b4c5d6", f"Expected head revision, got {version}"
+            assert version == "1042ddf2318a", f"Expected head revision, got {version}"
 
         # Verify new columns exist
         task_cols = _get_table_columns(engine, "tasks")
@@ -265,7 +265,7 @@ class TestFreshMigration:
 
         engine = create_engine(f"sqlite:///{db_path}")
         tables = _get_all_tables(engine)
-        expected_tables = {"instances", "projects", "tasks", "log_entries", "worktrees", "global_settings", "secrets"}
+        expected_tables = {"instances", "projects", "tasks", "log_entries", "worktrees", "global_settings", "secrets", "tags"}
         assert tables == expected_tables, f"Missing tables: {expected_tables - tables}"
 
         # Verify all columns from latest migration exist
@@ -284,7 +284,7 @@ class TestFreshMigration:
         # Verify alembic_version at head
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "e1f2a3b4c5d6"
+            assert version == "1042ddf2318a"
 
         engine.dispose()
 
@@ -326,7 +326,7 @@ class TestAlreadyMigratedDb:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "e1f2a3b4c5d6"
+            assert version == "1042ddf2318a"
         engine.dispose()
 
 
@@ -484,5 +484,5 @@ class TestInitDbLogic:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "e1f2a3b4c5d6"
+            assert version == "1042ddf2318a"
         engine.dispose()
