@@ -145,7 +145,18 @@ export function TasksPage() {
         </button>
       </div>
 
-      <TaskList tasks={tasks} projects={projects} onRefresh={refresh} onOpenChat={(t) => setChatTask(t)} />
+      <TaskList
+        tasks={tagFilter
+          ? tasks.filter((t) => {
+              if (!t.project_id) return false;
+              const proj = projects.find((p) => p.id === t.project_id);
+              return proj ? proj.tags.includes(tagFilter) : false;
+            })
+          : tasks}
+        projects={projects}
+        onRefresh={refresh}
+        onOpenChat={(t) => setChatTask(t)}
+      />
 
       {chatTask && chatTask.mode === 'loop' && (
         <LoopChatView task={chatTask} onBack={() => setChatTask(null)} />
