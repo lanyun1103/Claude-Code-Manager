@@ -207,7 +207,7 @@
 - **问题3**: 后端不支持 project_id/starred 筛选 — 前端传了 `project_id` 和 `starred` 参数，但后端 `list_tasks` API 和 TaskQueue 没接收处理
 - **解决**: 后端新增 star 端点和 TaskQueue.star()；list_tasks 增加 project_id/starred 参数；前端 TaskList 增加星标按钮；filters 增加 executing
 - **预防**: 新增前端筛选参数时，必须同步检查后端 API 是否接收该参数
-- **Commit**: (待提交)
+- **Commit**: 7d01b87
 
 ### 部署注意事项
 - **问题**: 重新部署时误杀了 Cloudflare Tunnel 的二级域名服务进程
