@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { api } from '../api/client';
 import type { TagItem } from '../api/client';
 import { X, Pencil, Trash2, Check, Plus } from 'lucide-react';
@@ -163,31 +163,41 @@ export function TagManager({ onClose, onChanged }: TagManagerProps) {
 
 function ColorPicker({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
   const current = TAG_COLOR_OPTIONS.find((c) => c.key === value) || TAG_COLOR_OPTIONS[0];
 
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
   return (
-    <div className="relative">
+    <div className="relative" ref={ref}>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`w-8 h-8 rounded-lg border-2 ${current.bg} ${current.border} flex items-center justify-center`}
+        className="w-8 h-8 rounded-lg border-2 border-gray-600 bg-gray-800 flex items-center justify-center hover:border-gray-500"
         title={current.label}
       >
-        <span className={`w-3 h-3 rounded-full ${current.dot}`} />
+        <span className={`w-4 h-4 rounded-full ${current.dot}`} />
       </button>
       {open && (
-        <div className="absolute z-50 top-full right-0 mt-1 p-2 bg-gray-700 border border-gray-600 rounded-lg shadow-xl grid grid-cols-5 gap-1.5">
+        <div className="absolute z-50 top-full right-0 mt-1 p-2.5 bg-gray-800 border border-gray-600 rounded-lg shadow-xl flex gap-2 flex-wrap" style={{ width: '180px' }}>
           {TAG_COLOR_OPTIONS.map((c) => (
             <button
               key={c.key}
               type="button"
               onClick={() => { onChange(c.key); setOpen(false); }}
-              className={`w-7 h-7 rounded-md border-2 ${c.bg} ${c.border} flex items-center justify-center ${
-                value === c.key ? 'ring-2 ring-white ring-offset-1 ring-offset-gray-700' : ''
+              className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform hover:scale-110 ${
+                value === c.key ? 'ring-2 ring-white ring-offset-2 ring-offset-gray-800' : ''
               }`}
               title={c.label}
             >
-              <span className={`w-3 h-3 rounded-full ${c.dot}`} />
+              <span className={`w-6 h-6 rounded-full ${c.dot}`} />
             </button>
           ))}
         </div>
