@@ -220,6 +220,15 @@
 - **预防**: 在 async 应用中运行重量级同步库时，优先用 subprocess 隔离，而非 run_in_executor
 - **Commit**: 2577c3b
 
+### SQLite 相对路径导致连接到错误的数据库
+- **问题**: 部署后 API 返回 500，`no such column: tasks.todo_file_path`，但手动查询根目录 db 列是存在的
+- **原因**: `database_url` 使用相对路径 `sqlite+aiosqlite:///./claude_manager.db`，部署脚本 `cd frontend && npm run build` 后工作目录停留在 `frontend/`，uvicorn 继承该 cwd，导致连接到 `frontend/claude_manager.db`（意外创建的旧数据库，缺少新增列）
+- **解决**: 在 `database.py` 中将 SQLite 相对路径解析为基于项目根目录 (`_PROJECT_ROOT`) 的绝对路径，不再依赖进程工作目录
+- **预防**:
+  - SQLite URL 中的相对路径必须解析为绝对路径，避免依赖 cwd
+  - 遇到意外的 db 文件时，先确认问题修复后再删除，或删除前先备份，避免误删重要数据
+- **Commit**: (待提交)
+
 ---
 
 ## 已知问题

@@ -13,7 +13,16 @@ logger = logging.getLogger(__name__)
 # Project root (where alembic.ini lives)
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
-engine = create_async_engine(settings.database_url, echo=False)
+# Resolve relative SQLite paths against the project root so the engine always
+# opens the correct database regardless of the process's working directory.
+_db_url = settings.database_url
+if _db_url.startswith("sqlite"):
+    import re
+    m = re.match(r"(sqlite\+?\w*:///)(\./.+)", _db_url)
+    if m:
+        _db_url = m.group(1) + str((_PROJECT_ROOT / m.group(2)).resolve())
+
+engine = create_async_engine(_db_url, echo=False)
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
 
