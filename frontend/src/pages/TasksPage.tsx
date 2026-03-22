@@ -110,7 +110,7 @@ export function TasksPage() {
         >
           <option value="">All Projects</option>
           {tagFilteredProjects.map((p) => (
-            <option key={p.id} value={p.id}>{p.name}</option>
+            <option key={p.id} value={p.id}>{p.name}{p.tags.length > 0 ? ` [${p.tags.join(', ')}]` : ''}</option>
           ))}
         </select>
 

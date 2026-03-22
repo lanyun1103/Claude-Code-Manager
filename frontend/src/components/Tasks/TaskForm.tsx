@@ -218,7 +218,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
             .filter((p) => p.show_in_selector && (!tagFilter || p.tags.includes(tagFilter)))
             .map((p) => (
               <option key={p.id} value={p.id}>
-                {p.name} {p.status !== 'ready' ? `(${p.status})` : ''}
+                {p.name}{p.tags.length > 0 ? ` [${p.tags.join(', ')}]` : ''} {p.status !== 'ready' ? `(${p.status})` : ''}
               </option>
             ))}
           <option value={NEW_PROJECT_VALUE}>+ New project</option>
