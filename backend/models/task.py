@@ -35,6 +35,7 @@ class Task(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    context_window_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     starred: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
     archived: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

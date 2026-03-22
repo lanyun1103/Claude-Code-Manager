@@ -25,7 +25,7 @@ class TaskQueue:
         project_id: int | None = None, starred: bool | None = None,
         limit: int = 50, offset: int = 0,
     ) -> list[Task]:
-        stmt = select(Task).order_by(Task.created_at.desc())
+        stmt = select(Task).order_by(Task.starred.desc(), Task.created_at.desc())
         if not include_archived:
             stmt = stmt.where(Task.archived == False)
         if status:

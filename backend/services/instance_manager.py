@@ -227,8 +227,15 @@ class InstanceManager:
         if task_id:
             await self.broadcaster.broadcast(f"task:{task_id}", broadcast_data)
 
-        # Broadcast context usage as a separate event for real-time tracking
+        # Persist and broadcast context usage
         if context_usage and task_id:
+            async with self.db_factory() as db:
+                await db.execute(
+                    update(Task)
+                    .where(Task.id == task_id)
+                    .values(context_window_usage=context_usage)
+                )
+                await db.commit()
             await self.broadcaster.broadcast(f"task:{task_id}", {
                 "event_type": "context_usage",
                 **context_usage,

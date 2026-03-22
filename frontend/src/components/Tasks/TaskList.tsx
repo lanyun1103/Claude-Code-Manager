@@ -82,7 +82,11 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
             )}
           </div>
           <div className="flex gap-1 shrink-0">
-            <button onClick={() => handleStar(t.id)} className={`p-1.5 ${t.starred ? 'text-yellow-400' : 'text-gray-400 hover:text-yellow-400'}`} title={t.starred ? "Unstar" : "Star"}>
+            <button
+              onClick={() => handleStar(t.id)}
+              className={`p-1.5 transition-colors ${t.starred ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-600 hover:text-yellow-400'}`}
+              title={t.starred ? "Unstar" : "Star"}
+            >
               <Star size={16} fill={t.starred ? 'currentColor' : 'none'} />
             </button>
             {t.session_id && (

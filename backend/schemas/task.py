@@ -66,6 +66,7 @@ class TaskResponse(BaseModel):
     archived: bool
     error_message: str | None
     tags: list[str] | None
+    context_window_usage: dict | None
     created_at: datetime
     started_at: datetime | None
     completed_at: datetime | None

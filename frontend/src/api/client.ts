@@ -93,6 +93,14 @@ export interface Task {
   session_id: string | null;
   error_message: string | null;
   tags: string[] | null;
+  context_window_usage: {
+    input_tokens: number;
+    cache_read_input_tokens: number;
+    cache_creation_input_tokens: number;
+    output_tokens: number;
+    total_input_tokens: number;
+    context_window?: number;
+  } | null;
   created_at: string;
   started_at: string | null;
   completed_at: string | null;
