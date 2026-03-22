@@ -237,3 +237,96 @@ async def test_create_task_image_paths_not_in_response(client):
     data = resp.json()
     # image_paths should not appear as a top-level key in the response schema
     assert "image_paths" not in data
+
+
+# === max_iterations tests ===
+
+
+@pytest.mark.asyncio
+async def test_create_loop_task_default_max_iterations(client):
+    """Loop task created without max_iterations gets default value of 50."""
+    resp = await client.post("/api/tasks", json={
+        "title": "Loop Default",
+        "mode": "loop",
+        "todo_file_path": "TODO.md",
+        "target_repo": "/tmp/repo",
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["max_iterations"] == 50
+
+
+@pytest.mark.asyncio
+async def test_create_loop_task_custom_max_iterations(client):
+    """Loop task created with custom max_iterations stores it correctly."""
+    resp = await client.post("/api/tasks", json={
+        "title": "Loop Custom",
+        "mode": "loop",
+        "todo_file_path": "TODO.md",
+        "target_repo": "/tmp/repo",
+        "max_iterations": 10,
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["max_iterations"] == 10
+
+
+@pytest.mark.asyncio
+async def test_create_auto_task_max_iterations_in_response(client):
+    """Non-loop task also exposes max_iterations in response (always 50 by default)."""
+    resp = await client.post("/api/tasks", json={
+        "title": "Auto Task",
+        "description": "do something",
+        "target_repo": "/tmp",
+    })
+    assert resp.status_code == 201
+    data = resp.json()
+    assert "max_iterations" in data
+    assert data["max_iterations"] == 50
+
+
+@pytest.mark.asyncio
+async def test_update_task_max_iterations(client):
+    """PUT /api/tasks/{id} can update max_iterations."""
+    create_resp = await client.post("/api/tasks", json={
+        "title": "Loop Task",
+        "mode": "loop",
+        "todo_file_path": "TODO.md",
+        "target_repo": "/tmp/repo",
+        "max_iterations": 20,
+    })
+    task_id = create_resp.json()["id"]
+
+    resp = await client.put(f"/api/tasks/{task_id}", json={"max_iterations": 5})
+    assert resp.status_code == 200
+    assert resp.json()["max_iterations"] == 5
+
+
+@pytest.mark.asyncio
+async def test_create_loop_task_requires_todo_file_path(client):
+    """Loop task without todo_file_path returns 422."""
+    resp = await client.post("/api/tasks", json={
+        "title": "Missing Todo",
+        "mode": "loop",
+        "target_repo": "/tmp/repo",
+    })
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_create_loop_task_max_iterations_persisted(client, session_factory):
+    """max_iterations value is actually persisted to the database."""
+    from backend.models.task import Task
+
+    resp = await client.post("/api/tasks", json={
+        "title": "Persisted",
+        "mode": "loop",
+        "todo_file_path": "TODO.md",
+        "target_repo": "/tmp/repo",
+        "max_iterations": 7,
+    })
+    task_id = resp.json()["id"]
+
+    async with session_factory() as db:
+        task = await db.get(Task, task_id)
+    assert task.max_iterations == 7

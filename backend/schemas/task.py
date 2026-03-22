@@ -13,6 +13,7 @@ class TaskCreate(BaseModel):
     max_retries: int = 2
     mode: str = "auto"  # "auto", "plan", or "loop"
     todo_file_path: str | None = None  # required when mode="loop"
+    max_iterations: int = 50  # loop only: max iterations before auto-abort
     tags: list[str] | None = None
     image_paths: list[str] | None = None  # absolute paths of uploaded images
     secret_ids: list[int] | None = None  # IDs of secrets to inject into prompt
@@ -34,7 +35,9 @@ class TaskUpdate(BaseModel):
     target_repo: str | None = None
     target_branch: str | None = None
     max_retries: int | None = None
+    max_iterations: int | None = None
     mode: str | None = None
+    starred: bool | None = None
     tags: list[str] | None = None
 
 
@@ -55,9 +58,11 @@ class TaskResponse(BaseModel):
     mode: str
     todo_file_path: str | None
     loop_progress: str | None
+    max_iterations: int
     plan_content: str | None
     plan_approved: bool | None
     session_id: str | None
+    starred: bool
     archived: bool
     error_message: str | None
     tags: list[str] | None

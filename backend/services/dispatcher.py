@@ -352,6 +352,8 @@ class GlobalDispatcher:
 
         iteration = 0
 
+        max_iterations = task.max_iterations or 50
+
         while True:
             # Check if task was cancelled externally between iterations
             async with self.db_factory() as db:
@@ -359,6 +361,20 @@ class GlobalDispatcher:
                 if t and t.status == "cancelled":
                     logger.info(f"Loop task {task.id} cancelled, stopping")
                     return
+
+            # Enforce max iterations limit
+            if iteration >= max_iterations:
+                async with self.db_factory() as db:
+                    queue = TaskQueue(db)
+                    await queue.mark_failed(task.id, f"超出最大迭代次数限制 ({max_iterations})")
+                await self.broadcaster.broadcast("tasks", {
+                    "event": "status_change",
+                    "task_id": task.id,
+                    "new_status": "failed",
+                    "instance_id": instance_id,
+                })
+                logger.warning(f"Loop task {task.id} exceeded max iterations ({max_iterations}), aborting")
+                return
 
             # Clear signal file so we can detect if Claude fails to write one
             signal_path.unlink(missing_ok=True)
@@ -384,7 +400,21 @@ class GlobalDispatcher:
                     process.kill()
                     await process.wait()
 
+            # P1: Check if task was cancelled while the iteration was running
+            # (e.g. user called cancel + stop-session mid-iteration)
+            async with self.db_factory() as db:
+                t = await db.get(Task, task.id)
+                if t and t.status == "cancelled":
+                    logger.info(f"Loop task {task.id} cancelled during iteration {iteration}, stopping")
+                    return
+
             signal = self._read_loop_signal(signal_path)
+
+            # P0: If signal is missing, attempt one resume to ask Claude to write it
+            if signal.get("reason") == "Signal file missing or invalid JSON":
+                signal = await self._resume_fix_signal(
+                    instance_id, task, cwd, signal_path, iteration, git_env or {}
+                )
 
             # Update loop_progress from signal (Claude's self-reported progress string)
             if signal.get("progress"):
@@ -415,6 +445,12 @@ class GlobalDispatcher:
                 async with self.db_factory() as db:
                     queue = TaskQueue(db)
                     await queue.mark_completed(task.id)
+                    await db.execute(
+                        update(Instance)
+                        .where(Instance.id == instance_id)
+                        .values(total_tasks_completed=Instance.total_tasks_completed + 1)
+                    )
+                    await db.commit()
                 await self.broadcaster.broadcast("tasks", {
                     "event": "status_change",
                     "task_id": task.id,
@@ -425,18 +461,24 @@ class GlobalDispatcher:
                 break
 
             else:
-                # "abort" or missing/malformed signal
+                # "abort" or missing/malformed signal — P1: retry if attempts remain
                 reason = signal.get("reason") or "Claude did not write a valid loop signal"
                 async with self.db_factory() as db:
                     queue = TaskQueue(db)
-                    await queue.mark_failed(task.id, reason)
+                    t = await queue.get(task.id)
+                    if t and t.retry_count < t.max_retries:
+                        await queue.retry(task.id)
+                        status = "pending"
+                    else:
+                        await queue.mark_failed(task.id, reason)
+                        status = "failed"
                 await self.broadcaster.broadcast("tasks", {
                     "event": "status_change",
                     "task_id": task.id,
-                    "new_status": "failed",
+                    "new_status": status,
                     "instance_id": instance_id,
                 })
-                logger.warning(f"Loop task {task.id} aborted at iteration {iteration}: {reason}")
+                logger.warning(f"Loop task {task.id} aborted at iteration {iteration} → {status}: {reason}")
                 break
 
         signal_path.unlink(missing_ok=True)
@@ -488,6 +530,59 @@ class GlobalDispatcher:
         except Exception as e:
             logger.warning(f"Failed to read loop signal from {signal_path}: {e}")
             return {"action": "abort", "reason": "Signal file missing or invalid JSON"}
+
+    async def _resume_fix_signal(
+        self,
+        instance_id: int,
+        task: Task,
+        cwd: str,
+        signal_path,
+        iteration: int,
+        git_env: dict,
+    ) -> dict:
+        """Resume the last session to ask Claude to write the missing signal file.
+
+        Called at most once per iteration when Claude completes work but forgets
+        to write the signal JSON.  Returns the signal dict (may still be abort if
+        Claude fails to write it on the second attempt).
+        """
+        async with self.db_factory() as db:
+            t = await db.get(Task, task.id)
+            resume_sid = t.session_id if t else None
+
+        if not resume_sid:
+            logger.warning(f"Loop task {task.id} iter {iteration}: signal missing and no session_id to resume")
+            return {"action": "abort", "reason": "Signal file missing and no session to resume"}
+
+        fix_prompt = (
+            f"你刚才完成了工作但忘记写信号文件。请检查 {task.todo_file_path} 的当前状态，"
+            f"然后立即将以下其中一个 JSON 写入 {signal_path}：\n\n"
+            f'还有待完成项：{{"action": "continue", "reason": "...", "progress": "已完成数/总数"}}\n'
+            f'全部完成：{{"action": "done", "reason": "所有 todo 项已完成"}}\n'
+            f'无法继续：{{"action": "abort", "reason": "具体原因"}}'
+        )
+
+        logger.info(f"Loop task {task.id} iter {iteration}: resuming session {resume_sid} to fix missing signal")
+        await self.instance_manager.launch(
+            instance_id=instance_id,
+            prompt=fix_prompt,
+            task_id=task.id,
+            cwd=cwd,
+            resume_session_id=resume_sid,
+            loop_iteration=iteration,
+            git_env=git_env,
+        )
+
+        fix_proc = self.instance_manager.processes.get(instance_id)
+        if fix_proc:
+            try:
+                await asyncio.wait_for(fix_proc.wait(), timeout=60)
+            except asyncio.TimeoutError:
+                logger.warning(f"Loop task {task.id} iter {iteration}: resume fix timed out, killing")
+                fix_proc.kill()
+                await fix_proc.wait()
+
+        return self._read_loop_signal(signal_path)
 
     async def _run_plan_phase(self, instance_id: int, task: Task, cwd: str, git_env: dict | None = None):
         """Run plan phase for plan-mode tasks."""

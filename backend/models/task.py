@@ -27,6 +27,7 @@ class Task(Base):
     mode: Mapped[str] = mapped_column(String(20), default="auto")  # "auto", "plan", or "loop"
     todo_file_path: Mapped[str | None] = mapped_column(String(500), nullable=True)  # loop only: path relative to target_repo
     loop_progress: Mapped[str | None] = mapped_column(String(200), nullable=True)  # loop only: e.g. "3/5", written by Claude
+    max_iterations: Mapped[int] = mapped_column(Integer, default=50)  # loop only: max iterations before auto-abort
     plan_content: Mapped[str | None] = mapped_column(Text, nullable=True)  # Claude's proposed plan
     plan_approved: Mapped[bool | None] = mapped_column(default=None)  # None=pending, True=approved, False=rejected
     session_id: Mapped[str | None] = mapped_column(String(200), nullable=True)
@@ -34,6 +35,7 @@ class Task(Base):
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     tags: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     metadata_: Mapped[dict | None] = mapped_column("metadata", JSON, nullable=True)
+    starred: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
     archived: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

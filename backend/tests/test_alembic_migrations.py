@@ -196,12 +196,13 @@ class TestLegacyMigration:
         with engine.connect() as conn:
             result = conn.execute(text("SELECT version_num FROM alembic_version"))
             version = result.scalar()
-            assert version == "69d5cf74de62", f"Expected head revision, got {version}"
+            assert version == "e1f2a3b4c5d6", f"Expected head revision, got {version}"
 
         # Verify new columns exist
         task_cols = _get_table_columns(engine, "tasks")
         assert "todo_file_path" in task_cols
         assert "loop_progress" in task_cols
+        assert "max_iterations" in task_cols
 
         log_cols = _get_table_columns(engine, "log_entries")
         assert "loop_iteration" in log_cols
@@ -237,10 +238,14 @@ class TestLegacyMigration:
 
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
-            # New columns default to NULL for existing rows
+            # New nullable columns default to NULL for existing rows
             row = conn.execute(text("SELECT todo_file_path, loop_progress FROM tasks WHERE id = 1")).fetchone()
             assert row[0] is None
             assert row[1] is None
+
+            # max_iterations has server_default=50, so existing rows get 50
+            row = conn.execute(text("SELECT max_iterations FROM tasks WHERE id = 1")).fetchone()
+            assert row[0] == 50
 
             row = conn.execute(text("SELECT loop_iteration FROM log_entries WHERE id = 1")).fetchone()
             assert row[0] is None
@@ -267,6 +272,7 @@ class TestFreshMigration:
         task_cols = _get_table_columns(engine, "tasks")
         assert "todo_file_path" in task_cols
         assert "loop_progress" in task_cols
+        assert "max_iterations" in task_cols
 
         log_cols = _get_table_columns(engine, "log_entries")
         assert "loop_iteration" in log_cols
@@ -278,7 +284,7 @@ class TestFreshMigration:
         # Verify alembic_version at head
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "69d5cf74de62"
+            assert version == "e1f2a3b4c5d6"
 
         engine.dispose()
 
@@ -320,7 +326,7 @@ class TestAlreadyMigratedDb:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "69d5cf74de62"
+            assert version == "e1f2a3b4c5d6"
         engine.dispose()
 
 
@@ -478,5 +484,5 @@ class TestInitDbLogic:
         engine = create_engine(f"sqlite:///{db_path}")
         with engine.connect() as conn:
             version = conn.execute(text("SELECT version_num FROM alembic_version")).scalar()
-            assert version == "69d5cf74de62"
+            assert version == "e1f2a3b4c5d6"
         engine.dispose()

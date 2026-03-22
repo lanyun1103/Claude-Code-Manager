@@ -20,6 +20,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
   const [priority, setPriority] = useState(0);
   const [mode, setMode] = useState('auto');
   const [todoFilePath, setTodoFilePath] = useState('');
+  const [maxIterations, setMaxIterations] = useState(50);
   const [loading, setLoading] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [tagFilter, setTagFilter] = useState<string>('');
@@ -104,7 +105,7 @@ export function TaskForm({ onCreated }: TaskFormProps) {
         project_id: pid as number,
         priority,
         mode,
-        ...(mode === 'loop' ? { todo_file_path: todoFilePath } : {}),
+        ...(mode === 'loop' ? { todo_file_path: todoFilePath, max_iterations: maxIterations } : {}),
         ...(uploadedPaths.length > 0 ? { image_paths: uploadedPaths } : {}),
         ...(selectedSecretIds.length > 0 ? { secret_ids: selectedSecretIds } : {}),
       });
@@ -259,13 +260,23 @@ export function TaskForm({ onCreated }: TaskFormProps) {
           <option value="loop">Loop (todo list)</option>
         </select>
         {mode === 'loop' && (
-          <input
-            className="flex-1 min-w-0 bg-gray-700 text-foreground rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            placeholder="Todo file path (e.g. TODO.md)"
-            value={todoFilePath}
-            onChange={(e) => setTodoFilePath(e.target.value)}
-            required
-          />
+          <>
+            <input
+              className="flex-1 min-w-0 bg-gray-700 text-foreground rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              placeholder="Todo file path (e.g. TODO.md)"
+              value={todoFilePath}
+              onChange={(e) => setTodoFilePath(e.target.value)}
+              required
+            />
+            <label className="text-sm text-gray-400 ml-1 whitespace-nowrap">Max iter:</label>
+            <input
+              type="number"
+              min={1}
+              className="w-20 bg-gray-700 text-foreground rounded px-2 py-1 text-sm"
+              value={maxIterations}
+              onChange={(e) => setMaxIterations(Math.max(1, Number(e.target.value)))}
+            />
+          </>
         )}
         <button
           type="submit"
