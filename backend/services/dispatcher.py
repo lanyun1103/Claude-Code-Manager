@@ -54,12 +54,12 @@ def _build_git_env(merged_config: dict) -> dict:
         )
         env["GIT_ASKPASS"] = askpass_script
         env["GIT_TERMINAL_PROMPT"] = "0"
-        # Override any system credential helpers (e.g. macOS osxkeychain) that
-        # would return cached credentials before GIT_ASKPASS is consulted.
-        # -c flags are not env vars, so we disable helpers via GIT_CONFIG_*:
-        env["GIT_CONFIG_COUNT"] = "1"
-        env["GIT_CONFIG_KEY_0"] = "credential.helper"
-        env["GIT_CONFIG_VALUE_0"] = ""
+        # Bypass global/system git config entirely so that macOS osxkeychain
+        # (or any other system credential helper) never intercepts our credentials.
+        # GIT_CONFIG_COUNT approach doesn't work: empty credential.helper via env
+        # is treated as an additive entry, not a chain reset.
+        env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+        env["GIT_CONFIG_NOSYSTEM"] = "1"
 
     # Fallback to instance-level SSH key (set via GIT_SSH_KEY_PATH env var)
     if "GIT_SSH_COMMAND" not in env and settings.git_ssh_key_path:

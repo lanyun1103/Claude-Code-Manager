@@ -181,13 +181,12 @@ class TestBuildGitEnv:
         """BUG FIX: HTTPS creds must disable system credential helpers.
 
         macOS osxkeychain caches old account credentials and takes priority
-        over GIT_ASKPASS. We use GIT_CONFIG_* to reset credential.helper.
+        over GIT_ASKPASS. We bypass global/system config entirely.
         """
         mock_settings.git_ssh_key_path = None
         env = _build_git_env({"git_https_token": "ghp_token"})
-        assert env["GIT_CONFIG_COUNT"] == "1"
-        assert env["GIT_CONFIG_KEY_0"] == "credential.helper"
-        assert env["GIT_CONFIG_VALUE_0"] == ""
+        assert env["GIT_CONFIG_GLOBAL"] == "/dev/null"
+        assert env["GIT_CONFIG_NOSYSTEM"] == "1"
 
     @patch("backend.services.dispatcher.settings")
     def test_ssh_and_https_simultaneously(self, mock_settings):
@@ -207,7 +206,7 @@ class TestBuildGitEnv:
         assert "GIT_ASKPASS" in env
         assert os.path.isfile(env["GIT_ASKPASS"])
         assert env["GIT_TERMINAL_PROMPT"] == "0"
-        assert env["GIT_CONFIG_COUNT"] == "1"
+        assert env["GIT_CONFIG_NOSYSTEM"] == "1"
 
     @patch("backend.services.dispatcher.settings")
     def test_reproduces_original_bug_scenario(self, mock_settings):
@@ -244,9 +243,8 @@ class TestBuildGitEnv:
         assert "GIT_ASKPASS" in env
         assert env["GIT_TERMINAL_PROMPT"] == "0"
         # osxkeychain must be disabled
-        assert env["GIT_CONFIG_COUNT"] == "1"
-        assert env["GIT_CONFIG_KEY_0"] == "credential.helper"
-        assert env["GIT_CONFIG_VALUE_0"] == ""
+        assert env["GIT_CONFIG_NOSYSTEM"] == "1"
+        assert env["GIT_CONFIG_GLOBAL"] == "/dev/null"
 
     @patch("backend.services.dispatcher.settings")
     def test_instance_level_ssh_fallback(self, mock_settings):
@@ -570,7 +568,7 @@ class TestCloneWithCredentials:
         clone_env = captured_envs[0]
         assert "GIT_ASKPASS" in clone_env
         assert clone_env["GIT_TERMINAL_PROMPT"] == "0"
-        assert clone_env["GIT_CONFIG_COUNT"] == "1"
+        assert clone_env["GIT_CONFIG_NOSYSTEM"] == "1"
 
     @pytest.mark.asyncio
     async def test_clone_passes_git_env_with_ssh(self):
