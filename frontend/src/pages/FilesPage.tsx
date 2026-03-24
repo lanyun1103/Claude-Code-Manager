@@ -209,7 +209,7 @@ function SSHPanel({ profiles, active, onActivate, onSave }: SSHPanelProps) {
               <span className="w-20 text-gray-400 flex-shrink-0">{label}</span>
               <input
                 type={type || 'text'}
-                value={String((editing as Record<string, unknown>)[key] ?? '')}
+                value={String((editing as unknown as Record<string, unknown>)[key] ?? '')}
                 onChange={(e) => setEditing({ ...editing, [key]: key === 'port' ? Number(e.target.value) : e.target.value })}
                 placeholder={placeholder}
                 className="flex-1 bg-gray-600 text-gray-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
