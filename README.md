@@ -2,6 +2,8 @@
 
 Web 端调度和管理多个 Claude Code 实例并行工作。灵感来自胡渊鸣的文章「我给 10 个 Claude Code 打工」。
 
+> **⚠️ 重要安全提示：** 本项目会以 `--dangerously-skip-permissions` 模式运行 Claude Code，这意味着 Claude Code 将拥有**不受限制的文件读写、命令执行和网络访问权限**，并且会自动执行 `git push` 等操作。**强烈建议在一台单独的、没有重要文件的电脑或虚拟机上部署**，避免对你的个人数据或工作环境造成意外影响。
+
 ## 功能
 
 - **全局调度器** — 启动时自动创建 worker、自动分配任务，无需手动操作
@@ -19,7 +21,7 @@ Web 端调度和管理多个 Claude Code 实例并行工作。灵感来自胡渊
 - **Android App** — 通过 Capacitor 打包原生 APK，App 内可配置远程服务器地址
 - **主题切换** — 支持浅色/深色主题，偏好持久化
 - **Token 认证** — Bearer Token 保护所有 API，安全远程访问
-- **远程访问** — 通过 ngrok / Cloudflare Tunnel 隧道暴露到公网
+- **远程访问** — 通过 Cloudflare Tunnel 隧道暴露到公网
 
 ## 任务生命周期
 
@@ -52,7 +54,7 @@ pending → in_progress → executing → completed
 | Frontend | React, Vite, Tailwind CSS v4, TypeScript |
 | 实时通信 | WebSocket |
 | 语音 | OpenAI Whisper API |
-| 远程 | ngrok / Cloudflare Tunnel |
+| 远程 | Cloudflare Tunnel |
 
 ## 项目结构
 
@@ -83,7 +85,7 @@ claude-manager/
 │       └── pages/       # Dashboard, TasksPage, LoginPage, ServerConfigPage
 ├── scripts/
 │   ├── dev.sh           # 一键启动开发环境
-│   └── tunnel.sh        # ngrok 隧道
+│   └── tunnel.sh        # 隧道脚本
 ├── pyproject.toml
 └── .env
 ```
@@ -131,23 +133,6 @@ cd frontend && npx vite --host &
 访问 http://localhost:5173，输入 `AUTH_TOKEN` 登录。
 
 启动后 Dispatcher 会自动创建 worker 实例并开始调度。
-
-### 远程访问（ngrok）
-
-```bash
-# 安装 ngrok
-brew install ngrok
-ngrok config add-authtoken YOUR_NGROK_TOKEN
-
-# 生产模式：构建前端静态文件，由后端统一服务
-cd frontend && npm run build && cd ..
-uv run uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
-
-# 启动隧道
-ngrok http 8000
-```
-
-用 ngrok 给出的 https URL 从手机访问。
 
 ### Android App 打包
 
