@@ -38,6 +38,7 @@ class Task(Base):
     context_window_usage: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     starred: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
     archived: Mapped[bool] = mapped_column(default=False, server_default="0", index=True)
+    has_unread: Mapped[bool] = mapped_column(default=False, server_default="0")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     started_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

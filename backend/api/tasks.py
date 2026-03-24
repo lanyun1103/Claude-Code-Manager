@@ -121,6 +121,14 @@ async def star_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
     return task
 
 
+@router.post("/{task_id}/read", response_model=TaskResponse)
+async def mark_task_read(task_id: int, queue: TaskQueue = Depends(_get_queue)):
+    task = await queue.update_task(task_id, has_unread=False)
+    if not task:
+        raise HTTPException(404, "Task not found")
+    return task
+
+
 @router.post("/{task_id}/archive", response_model=TaskResponse)
 async def archive_task(task_id: int, queue: TaskQueue = Depends(_get_queue)):
     task = await queue.archive(task_id)

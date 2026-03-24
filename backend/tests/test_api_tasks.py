@@ -330,3 +330,64 @@ async def test_create_loop_task_max_iterations_persisted(client, session_factory
     async with session_factory() as db:
         task = await db.get(Task, task_id)
     assert task.max_iterations == 7
+
+
+# === has_unread tests ===
+
+
+@pytest.mark.asyncio
+async def test_create_task_has_unread_defaults_false(client):
+    """New task has has_unread=False by default."""
+    resp = await client.post("/api/tasks", json={
+        "title": "Unread test", "description": "d", "target_repo": "/tmp",
+    })
+    assert resp.status_code == 201
+    assert resp.json()["has_unread"] is False
+
+
+@pytest.mark.asyncio
+async def test_mark_task_read_clears_unread(client, session_factory):
+    """POST /api/tasks/{id}/read sets has_unread=False."""
+    from backend.models.task import Task
+    from sqlalchemy import update
+
+    create_resp = await client.post("/api/tasks", json={
+        "title": "Unread", "description": "d", "target_repo": "/tmp",
+    })
+    task_id = create_resp.json()["id"]
+
+    # Set has_unread=True directly in DB
+    async with session_factory() as db:
+        await db.execute(update(Task).where(Task.id == task_id).values(has_unread=True))
+        await db.commit()
+
+    resp = await client.post(f"/api/tasks/{task_id}/read")
+    assert resp.status_code == 200
+    assert resp.json()["has_unread"] is False
+
+
+@pytest.mark.asyncio
+async def test_mark_task_read_not_found(client):
+    """POST /api/tasks/9999/read returns 404 for missing task."""
+    resp = await client.post("/api/tasks/9999/read")
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_has_unread_persisted_in_db(client, session_factory):
+    """has_unread=True set in DB is returned in task response."""
+    from backend.models.task import Task
+    from sqlalchemy import update
+
+    create_resp = await client.post("/api/tasks", json={
+        "title": "Persist unread", "description": "d", "target_repo": "/tmp",
+    })
+    task_id = create_resp.json()["id"]
+
+    async with session_factory() as db:
+        await db.execute(update(Task).where(Task.id == task_id).values(has_unread=True))
+        await db.commit()
+
+    resp = await client.get(f"/api/tasks/{task_id}")
+    assert resp.status_code == 200
+    assert resp.json()["has_unread"] is True

@@ -64,6 +64,7 @@ class TaskResponse(BaseModel):
     session_id: str | None
     starred: bool
     archived: bool
+    has_unread: bool
     error_message: str | None
     tags: list[str] | None
     context_window_usage: dict | None

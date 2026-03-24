@@ -90,6 +90,7 @@ export interface Task {
   plan_approved: boolean | null;
   starred: boolean;
   archived: boolean;
+  has_unread: boolean;
   session_id: string | null;
   error_message: string | null;
   tags: string[] | null;
@@ -247,6 +248,8 @@ export const api = {
     request<Task>(`/api/tasks/${id}/star`, { method: 'POST' }),
   archiveTask: (id: number) =>
     request<Task>(`/api/tasks/${id}/archive`, { method: 'POST' }),
+  markTaskRead: (id: number) =>
+    request<Task>(`/api/tasks/${id}/read`, { method: 'POST' }),
   stopTaskSession: (id: number) =>
     request<{ ok: boolean }>(`/api/tasks/${id}/stop-session`, { method: 'POST' }),
   createTask: (data: { title?: string; description?: string; project_id?: number; priority?: number; target_branch?: string; mode?: string; todo_file_path?: string; max_iterations?: number; image_paths?: string[]; secret_ids?: number[] }) =>

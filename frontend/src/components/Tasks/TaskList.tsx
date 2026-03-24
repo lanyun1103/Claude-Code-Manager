@@ -92,9 +92,12 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
             {t.session_id && (
               <button
                 onClick={() => onOpenChat(t)}
-                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
+                className="relative flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
                 title="Chat"
               >
+                {t.has_unread && (
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
+                )}
                 <MessageCircle size={14} /> Chat
               </button>
             )}

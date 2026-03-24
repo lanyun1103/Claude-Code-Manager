@@ -387,3 +387,147 @@ async def test_process_event_broadcasts_context_usage_to_task(db_factory):
     assert ctx_data["total_input_tokens"] == 155
     assert ctx_data["context_window"] == 1000000
     assert ctx_data["input_tokens"] == 5
+
+
+@pytest.mark.asyncio
+async def test_process_event_sets_has_unread_on_assistant_message(db_factory):
+    """_process_event sets has_unread=True on task when assistant message event arrives."""
+    async with db_factory() as db:
+        inst = Instance(name="unread-inst")
+        db.add(inst)
+        task = Task(title="unread task", description="d")
+        db.add(task)
+        await db.commit()
+        await db.refresh(inst)
+        await db.refresh(task)
+        inst_id = inst.id
+        task_id = task.id
+
+    broadcaster = MagicMock()
+    broadcaster.broadcast = AsyncMock()
+    im = InstanceManager(db_factory, broadcaster)
+
+    event = {
+        "event_type": "message",
+        "role": "assistant",
+        "content": "Here is my response",
+        "tool_name": None,
+        "tool_input": None,
+        "tool_output": None,
+        "raw_json": "{}",
+        "is_error": False,
+    }
+
+    await im._process_event(inst_id, task_id, event)
+
+    async with db_factory() as db:
+        task = await db.get(Task, task_id)
+    assert task.has_unread is True
+
+
+@pytest.mark.asyncio
+async def test_process_event_sets_has_unread_on_result(db_factory):
+    """_process_event sets has_unread=True on task when result event arrives."""
+    async with db_factory() as db:
+        inst = Instance(name="unread-result-inst")
+        db.add(inst)
+        task = Task(title="result task", description="d")
+        db.add(task)
+        await db.commit()
+        await db.refresh(inst)
+        await db.refresh(task)
+        inst_id = inst.id
+        task_id = task.id
+
+    broadcaster = MagicMock()
+    broadcaster.broadcast = AsyncMock()
+    im = InstanceManager(db_factory, broadcaster)
+
+    event = {
+        "event_type": "result",
+        "role": "assistant",
+        "content": "Task completed",
+        "tool_name": None,
+        "tool_input": None,
+        "tool_output": None,
+        "raw_json": "{}",
+        "is_error": False,
+    }
+
+    await im._process_event(inst_id, task_id, event)
+
+    async with db_factory() as db:
+        task = await db.get(Task, task_id)
+    assert task.has_unread is True
+
+
+@pytest.mark.asyncio
+async def test_process_event_does_not_set_has_unread_for_user_message(db_factory):
+    """_process_event does NOT set has_unread for user role messages."""
+    async with db_factory() as db:
+        inst = Instance(name="user-msg-inst")
+        db.add(inst)
+        task = Task(title="user msg task", description="d")
+        db.add(task)
+        await db.commit()
+        await db.refresh(inst)
+        await db.refresh(task)
+        inst_id = inst.id
+        task_id = task.id
+
+    broadcaster = MagicMock()
+    broadcaster.broadcast = AsyncMock()
+    im = InstanceManager(db_factory, broadcaster)
+
+    event = {
+        "event_type": "message",
+        "role": "user",
+        "content": "User says hello",
+        "tool_name": None,
+        "tool_input": None,
+        "tool_output": None,
+        "raw_json": "{}",
+        "is_error": False,
+    }
+
+    await im._process_event(inst_id, task_id, event)
+
+    async with db_factory() as db:
+        task = await db.get(Task, task_id)
+    assert task.has_unread is False
+
+
+@pytest.mark.asyncio
+async def test_process_event_does_not_set_has_unread_for_tool_use(db_factory):
+    """_process_event does NOT set has_unread for tool_use events."""
+    async with db_factory() as db:
+        inst = Instance(name="tool-inst")
+        db.add(inst)
+        task = Task(title="tool task", description="d")
+        db.add(task)
+        await db.commit()
+        await db.refresh(inst)
+        await db.refresh(task)
+        inst_id = inst.id
+        task_id = task.id
+
+    broadcaster = MagicMock()
+    broadcaster.broadcast = AsyncMock()
+    im = InstanceManager(db_factory, broadcaster)
+
+    event = {
+        "event_type": "tool_use",
+        "role": "assistant",
+        "content": None,
+        "tool_name": "Bash",
+        "tool_input": '{"command": "ls"}',
+        "tool_output": None,
+        "raw_json": "{}",
+        "is_error": False,
+    }
+
+    await im._process_event(inst_id, task_id, event)
+
+    async with db_factory() as db:
+        task = await db.get(Task, task_id)
+    assert task.has_unread is False

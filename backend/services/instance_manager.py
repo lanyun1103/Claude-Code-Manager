@@ -221,6 +221,16 @@ class InstanceManager:
             )
             await db.commit()
 
+        # Mark task as unread when assistant produces a message or result
+        if task_id and event.get("role") == "assistant" and event["event_type"] in ("message", "result"):
+            async with self.db_factory() as db:
+                await db.execute(
+                    update(Task)
+                    .where(Task.id == task_id)
+                    .values(has_unread=True)
+                )
+                await db.commit()
+
         # Broadcast via WebSocket
         broadcast_data = {k: v for k, v in event.items() if k != "raw_json"}
         await self.broadcaster.broadcast(f"instance:{instance_id}", broadcast_data)

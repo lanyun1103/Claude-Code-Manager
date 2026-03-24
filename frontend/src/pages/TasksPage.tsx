@@ -155,7 +155,12 @@ export function TasksPage() {
           : tasks}
         projects={projects}
         onRefresh={refresh}
-        onOpenChat={(t) => setChatTask(t)}
+        onOpenChat={(t) => {
+          setChatTask(t);
+          if (t.has_unread) {
+            api.markTaskRead(t.id).catch(() => {});
+          }
+        }}
       />
 
       {chatTask && chatTask.mode === 'loop' && (
