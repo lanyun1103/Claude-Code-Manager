@@ -7,13 +7,15 @@
 set -e
 cd "$(dirname "$0")/.."
 
-PORTS=(8000 8100 8200 8300)
-NAMES=(xiaoyu binyu sunzhen weiyao)
+PORTS=(8000 8100 8200 8300 8400 8500)
+NAMES=(xiaoyu binyu sunzhen weiyao chengsong shaohu)
 TOKENS=(
-    "NZkT7SN1_o7KMoon2i1hugC50PJRT7Eva29715cgG8E"
-    "xBnutJ-Nwv7iX0PG3YgdD3yNmEFBsVS7oARTzqxKdeg"
-    "O76HKD7Oq7oIzUFKX0S8tNRcXzuTGdXNVq4Yk2LPH9Y"
-    "4Cnni6pLaH87RJFLpOg-Rdozhp-T8wZ6K-PI4BCC244"
+    "SlXGAkAkry4qKsC2j336PnHKdpHZ2gc5CRfEL97mseI"
+    "GZ_Dbn-yDgHXxyDSDD3r6EIqm_iEjdYleXpNei_6Ums"
+    "8qExxc3ilVpASajLbVWcJUPLTTgJWwSgEn0CGs7FI-8"
+    "yjqxt-7H4S-sGnFRmSqVrNCw6smGThKCYY3-Dad7y5g"
+    "rkc98c9QwMIla6bcjwnnKw_hJdRmnBujqURUp8vyWLY"
+    "y12tTzdn-0UuDqdAUdO96eqEtzChCA8ZE1ezZoOSykY"
 )
 PIDS=()
 

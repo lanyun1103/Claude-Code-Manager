@@ -153,6 +153,14 @@ export function ChatView({ task, onBack }: ChatViewProps) {
 
   useWebSocket([`task:${task.id}`], handleWsMessage);
 
+  // Reset sending state when task reaches a terminal status
+  // (catches cases where process_exit WebSocket event is missed)
+  useEffect(() => {
+    if (['completed', 'failed', 'cancelled', 'pending'].includes(task.status)) {
+      setSending(false);
+    }
+  }, [task.status]);
+
   // Load chat history
   useEffect(() => {
     api.getTaskChatHistory(task.id).then((msgs) => {
