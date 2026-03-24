@@ -53,7 +53,7 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
   return (
     <div className="space-y-2">
       {tasks.map((t) => (
-        <div key={t.id} className="bg-gray-800 rounded-lg p-3 flex items-start gap-3">
+        <div key={t.id} className={`rounded-lg p-3 flex items-start gap-3 ${t.has_unread ? 'bg-indigo-900/50 ring-1 ring-indigo-500/50' : 'bg-gray-800'}`}>
           <span className={`mt-1 w-2.5 h-2.5 rounded-full shrink-0 ${statusColors[t.status] || 'bg-gray-500'}`} />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
@@ -92,12 +92,9 @@ export function TaskList({ tasks, projects, onRefresh, onOpenChat }: TaskListPro
             {t.session_id && (
               <button
                 onClick={() => onOpenChat(t)}
-                className="relative flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
+                className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30"
                 title="Chat"
               >
-                {t.has_unread && (
-                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full" />
-                )}
                 <MessageCircle size={14} /> Chat
               </button>
             )}
