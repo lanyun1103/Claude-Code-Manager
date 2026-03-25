@@ -41,7 +41,7 @@ async def test_instance_defaults(db_session):
     await db_session.refresh(inst)
 
     assert inst.status == "idle"
-    assert inst.model == "sonnet"
+    assert inst.model == "default"
     assert inst.total_tasks_completed == 0
     assert inst.total_cost_usd == 0.0
     assert inst.pid is None

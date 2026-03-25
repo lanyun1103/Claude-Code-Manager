@@ -48,7 +48,7 @@ async def test_create_instance(client):
     data = resp.json()
     assert data["name"] == "worker-1"
     assert data["status"] == "idle"
-    assert data["model"] == "sonnet"
+    assert data["model"] == "default"
 
 
 @pytest.mark.asyncio
