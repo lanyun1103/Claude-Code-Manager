@@ -261,16 +261,14 @@ export function ChatView({ task, projects, onBack }: ChatViewProps) {
             {projectName && (
               <span className="text-xs bg-emerald-600/30 text-emerald-300 px-1.5 rounded font-medium whitespace-nowrap">{projectName}</span>
             )}
-            {task.description && (
-              <p className="text-sm text-gray-400 truncate">{task.description}</p>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-gray-500 whitespace-nowrap">
               {task.session_id ? 'Session active' : 'No session yet'}
             </p>
             {contextUsage && <ContextUsageIndicator usage={contextUsage} />}
           </div>
+          {task.description && (
+            <p className="text-sm text-gray-400 truncate">{task.description}</p>
+          )}
         </div>
         {(sending || ['in_progress', 'executing'].includes(task.status)) && (
           <button
