@@ -250,7 +250,12 @@ export function ChatView({ task, onBack }: ChatViewProps) {
           <ArrowLeft size={20} />
         </button>
         <div className="flex-1 min-w-0">
-          <p className="text-foreground font-medium text-sm truncate">Task #{task.id}</p>
+          <div className="flex items-center gap-2">
+            <p className="text-foreground font-medium text-sm whitespace-nowrap">Task #{task.id}</p>
+            {task.description && (
+              <p className="text-sm text-gray-400 truncate">{task.description}</p>
+            )}
+          </div>
           <p className="text-xs text-gray-500">
             {task.session_id ? 'Session active' : 'No session yet'}
           </p>
@@ -275,14 +280,6 @@ export function ChatView({ task, onBack }: ChatViewProps) {
           </button>
         )}
       </div>
-
-      {/* Initial Prompt */}
-      {task.description && (
-        <div className="px-4 py-2 border-b border-gray-800 bg-gray-900/50">
-          <p className="text-xs text-gray-500 mb-0.5">Initial Prompt</p>
-          <p className="text-sm text-foreground line-clamp-2">{task.description}</p>
-        </div>
-      )}
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
