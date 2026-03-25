@@ -2,13 +2,14 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { api } from '../../api/client';
-import type { ChatMessage, Task, UploadResult } from '../../api/client';
+import type { ChatMessage, Task, Project, UploadResult } from '../../api/client';
 import { useWebSocket } from '../../hooks/useWebSocket';
 import { Send, ArrowLeft, Loader2, ChevronDown, ChevronRight, Copy, Check, Paperclip, X, StopCircle } from 'lucide-react';
 import { SecretPicker } from '../Secrets/SecretPicker';
 
 interface ChatViewProps {
   task: Task;
+  projects: Project[];
   onBack: () => void;
 }
 
@@ -86,7 +87,12 @@ function ContextUsageIndicator({ usage }: { usage: ContextUsage }) {
   );
 }
 
-export function ChatView({ task, onBack }: ChatViewProps) {
+export function ChatView({ task, projects, onBack }: ChatViewProps) {
+  const projectName = useMemo(() => {
+    if (!task.project_id) return null;
+    const p = projects.find((p) => p.id === task.project_id);
+    return p?.name ?? null;
+  }, [task.project_id, projects]);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
@@ -245,22 +251,27 @@ export function ChatView({ task, onBack }: ChatViewProps) {
   return (
     <div className="fixed inset-0 bg-gray-950 flex flex-col z-50">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))] border-b border-gray-800 bg-gray-900">
+      <div className="flex items-center gap-3 px-4 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b border-gray-800 bg-gray-900">
         <button onClick={onBack} className="text-gray-400 hover:text-foreground">
           <ArrowLeft size={20} />
         </button>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <p className="text-foreground font-medium text-sm whitespace-nowrap">Task #{task.id}</p>
+            {projectName && (
+              <span className="text-xs bg-emerald-600/30 text-emerald-300 px-1.5 rounded font-medium whitespace-nowrap">{projectName}</span>
+            )}
             {task.description && (
               <p className="text-sm text-gray-400 truncate">{task.description}</p>
             )}
           </div>
-          <p className="text-xs text-gray-500">
-            {task.session_id ? 'Session active' : 'No session yet'}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs text-gray-500">
+              {task.session_id ? 'Session active' : 'No session yet'}
+            </p>
+            {contextUsage && <ContextUsageIndicator usage={contextUsage} />}
+          </div>
         </div>
-        {contextUsage && <ContextUsageIndicator usage={contextUsage} />}
         {(sending || ['in_progress', 'executing'].includes(task.status)) && (
           <button
             onClick={async () => {
