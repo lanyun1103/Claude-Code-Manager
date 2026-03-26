@@ -16,8 +16,11 @@ const statusColors: Record<string, string> = {
   stopped: 'bg-yellow-500',
 };
 
+const MODEL_OPTIONS = ['default', 'opus[1m]', 'opus', 'sonnet', 'haiku'];
+
 export function InstanceGrid({ instances, onRefresh, onViewLogs }: InstanceGridProps) {
   const [newName, setNewName] = useState('');
+  const [newModel, setNewModel] = useState('');
   const [dispatcherRunning, setDispatcherRunning] = useState(false);
 
   useEffect(() => {
@@ -28,8 +31,9 @@ export function InstanceGrid({ instances, onRefresh, onViewLogs }: InstanceGridP
 
   const handleCreate = async () => {
     const name = newName || `worker-${instances.length + 1}`;
-    await api.createInstance({ name });
+    await api.createInstance({ name, model: newModel || 'default' });
     setNewName('');
+    setNewModel('');
     onRefresh();
   };
 
@@ -62,6 +66,18 @@ export function InstanceGrid({ instances, onRefresh, onViewLogs }: InstanceGridP
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
         />
+        <input
+          className="w-[180px] bg-gray-700 text-foreground rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          placeholder="Model (default)"
+          value={newModel}
+          onChange={(e) => setNewModel(e.target.value)}
+          list="model-options"
+        />
+        <datalist id="model-options">
+          {MODEL_OPTIONS.map((m) => (
+            <option key={m} value={m} />
+          ))}
+        </datalist>
         <button
           onClick={handleCreate}
           className="flex items-center gap-1 bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded text-sm font-medium whitespace-nowrap"
