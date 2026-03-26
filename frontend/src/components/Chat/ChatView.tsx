@@ -97,6 +97,7 @@ export function ChatView({ task, projects, onBack }: ChatViewProps) {
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const [interrupting, setInterrupting] = useState(false);
+  const [stillRunning, setStillRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
@@ -237,7 +238,12 @@ export function ChatView({ task, projects, onBack }: ChatViewProps) {
       await api.sendTaskChat(task.id, text || '(images attached)', uploadedPaths, selectedSecretIds.length > 0 ? selectedSecretIds : undefined);
     } catch (e) {
       setSending(false);
-      setError(String(e));
+      const errMsg = String(e);
+      // 409 = task still being processed, show Interrupt button
+      if (errMsg.includes('409') || errMsg.toLowerCase().includes('currently being processed')) {
+        setStillRunning(true);
+      }
+      setError(errMsg);
     }
   };
 
@@ -270,13 +276,15 @@ export function ChatView({ task, projects, onBack }: ChatViewProps) {
             <p className="text-sm text-gray-400 truncate">{task.description}</p>
           )}
         </div>
-        {(sending || ['in_progress', 'executing'].includes(task.status)) && (
+        {(sending || stillRunning || ['in_progress', 'executing'].includes(task.status)) && (
           <button
             onClick={async () => {
               setInterrupting(true);
               try {
                 await api.stopTaskSession(task.id);
                 setSending(false);
+                setStillRunning(false);
+                setError(null);
               } catch { /* ignore */ }
               finally { setInterrupting(false); }
             }}

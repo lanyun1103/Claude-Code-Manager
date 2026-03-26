@@ -43,11 +43,16 @@ async def send_chat_message(
         raise HTTPException(400, "No previous session on this task. Run the task first.")
 
     # Check no instance is currently working on this task
+    busy_instance_id = None
     for inst_id, proc in instance_manager.processes.items():
         if proc.returncode is None:
             inst = await db.get(Instance, inst_id)
             if inst and inst.current_task_id == task_id:
-                raise HTTPException(400, "Task is currently being processed. Wait for it to finish.")
+                busy_instance_id = inst_id
+                break
+
+    if busy_instance_id is not None:
+        raise HTTPException(409, "Task is currently being processed. Use Interrupt to stop it first.")
 
     # Find an idle instance
     inst = await _find_idle_instance(db)

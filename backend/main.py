@@ -93,6 +93,10 @@ async def lifespan(app: FastAPI):
 
     yield
 
+    # Stop all running Claude processes before shutdown
+    for inst_id in list(instance_manager.processes.keys()):
+        await instance_manager.stop(inst_id)
+
     if backup_svc:
         backup_svc.stop()
     await dispatcher.stop()
